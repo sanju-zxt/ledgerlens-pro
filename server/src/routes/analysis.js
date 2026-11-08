@@ -28,13 +28,12 @@ router.post("/anomalies", async (req, res, next) => {
   try {
     if (!Array.isArray(req.body?.transactions) || req.body.transactions.length > 1000) return res.status(400).json({ message: "transactions must be an array of at most 1000 items" });
     if (req.user.demo && req.body.source === "PAYPAL_TRANSACTION_SEARCH") return res.status(403).json({ message: "Demo sessions can access only labeled sandbox evidence." });
-    const base = process.env.ML_ENGINE_URL || (process.env.ML_ENGINE_HOST
-      ? `http://${process.env.ML_ENGINE_HOST}:${process.env.ML_ENGINE_PORT || 10000}`
-      : "http://127.0.0.1:8001");
-    const result = await axios.post(`${base.replace(/\/$/, "")}/anomaly`, { transactions: req.body.transactions, sensitivity: req.body.sensitivity ?? 0.1 }, { timeout: 15000 });
+    const base = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+    const headers = process.env.ML_ENGINE_API_KEY ? { Authorization: `Bearer ${process.env.ML_ENGINE_API_KEY}` } : {};
+    const result = await axios.post(`${base.replace(/\/$/, "")}/anomaly`, { transactions: req.body.transactions, sensitivity: req.body.sensitivity ?? 0.1 }, { timeout: 20000, headers });
     res.json({ ...result.data, source: req.body.source || "USER_PROVIDED", retrieved_at: new Date().toISOString() });
   } catch (error) {
-    if (error.code === "ECONNREFUSED" || error.code === "ETIMEDOUT" || error.code === "ECONNABORTED") return res.status(503).json({ message: "ML service is unavailable. Start the Python service on port 8001." });
+    if (["ECONNREFUSED", "ETIMEDOUT", "ECONNABORTED", "ENOTFOUND", "EAI_AGAIN"].includes(error.code)) return res.status(503).json({ message: "ML service is unavailable. Check the configured ML_ENGINE_URL." });
     if (error.response) return res.status(error.response.status).json({ message: error.response.data?.detail || "ML service rejected the analysis request" });
     next(error);
   }

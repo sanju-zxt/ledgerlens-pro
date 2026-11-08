@@ -1,6 +1,24 @@
 import asyncio
+import os
 import unittest
-from main import AnomalyRequest, CalibrationRequest, ForecastRequest, Transaction, calibration, detect_anomaly, forecast
+from unittest.mock import patch
+from fastapi import HTTPException
+from main import AnomalyRequest, CalibrationRequest, ForecastRequest, Transaction, calibration, detect_anomaly, forecast, require_internal_api_key
+
+
+class ServiceAuthTests(unittest.TestCase):
+    def test_production_requires_a_configured_shared_key(self):
+        with patch.dict(os.environ, {"NODE_ENV": "production"}, clear=True):
+            with self.assertRaises(HTTPException) as error:
+                require_internal_api_key(None)
+        self.assertEqual(error.exception.status_code, 503)
+
+    def test_shared_key_is_required_and_compared(self):
+        with patch.dict(os.environ, {"ML_ENGINE_API_KEY": "test-only-key"}, clear=True):
+            require_internal_api_key("Bearer test-only-key")
+            with self.assertRaises(HTTPException) as error:
+                require_internal_api_key("Bearer wrong-key")
+        self.assertEqual(error.exception.status_code, 401)
 
 
 class ForecastTests(unittest.TestCase):

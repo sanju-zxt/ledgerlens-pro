@@ -1,3 +1,9 @@
+envVarGroups:
+  - name: ledgerlens-ml-internal
+    envVars:
+      - key: ML_ENGINE_API_KEY
+        generateValue: true
+
 services:
   - type: web
     name: ledgerlens-api
@@ -17,16 +23,9 @@ services:
         value: "true"
       - key: PAYPAL_ENV
         value: sandbox
-      - key: ML_ENGINE_HOST
-        fromService:
-          name: ledgerlens-ml
-          type: web
-          property: host
-      - key: ML_ENGINE_PORT
-        fromService:
-          name: ledgerlens-ml
-          type: web
-          property: port
+      - key: ML_ENGINE_URL
+        value: https://ledgerlens-ml.onrender.com
+      - fromGroup: ledgerlens-ml-internal
   - type: web
     name: ledgerlens-ml
     runtime: python
@@ -34,3 +33,5 @@ services:
     rootDir: ml-engine
     buildCommand: pip install -r requirements.txt
     startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - fromGroup: ledgerlens-ml-internal

@@ -1,11 +1,24 @@
 """LedgerLens analytical endpoints. Model outputs are estimates, never observations."""
 from typing import List
+import hmac
+import os
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 
 app = FastAPI(title="LedgerLens ML Engine", version="1.0.0")
+
+
+def require_internal_api_key(authorization: str | None = Header(default=None)):
+    expected = os.getenv("ML_ENGINE_API_KEY")
+    if not expected:
+        if os.getenv("NODE_ENV") == "production":
+            raise HTTPException(503, "ML service authentication is not configured")
+        return
+    supplied = authorization.removeprefix("Bearer ") if authorization else ""
+    if not hmac.compare_digest(supplied, expected):
+        raise HTTPException(401, "Invalid ML service credentials")
 
 
 class Transaction(BaseModel):
@@ -48,7 +61,7 @@ async def health():
     return {"status": "ok", "service": "ml-engine"}
 
 
-@app.post("/forecast")
+@app.post("/forecast", dependencies=[Depends(require_internal_api_key)])
 async def forecast(request: ForecastRequest):
     if request.emergency_min > request.emergency_max:
         raise HTTPException(400, "emergency_min must not exceed emergency_max")
@@ -105,7 +118,7 @@ async def forecast(request: ForecastRequest):
     }
 
 
-@app.post("/anomaly")
+@app.post("/anomaly", dependencies=[Depends(require_internal_api_key)])
 async def detect_anomaly(request: AnomalyRequest):
     eligible = [(i, tx) for i, tx in enumerate(request.transactions) if tx.status.upper() in {"COMPLETED", "S", "REFUNDED", "REVERSED"}]
     if len(eligible) < 3:
@@ -117,7 +130,7 @@ async def detect_anomaly(request: AnomalyRequest):
     return {"anomalies": [{"index": index, "transaction": tx.model_dump(), "score": float(scores[j])} for j, ((index, tx), pred) in enumerate(zip(eligible, predictions)) if pred == -1], "total_checked": len(eligible), "interpretation": "Statistical outliers are not confirmed fraud."}
 
 
-@app.post("/calibration")
+@app.post("/calibration", dependencies=[Depends(require_internal_api_key)])
 async def calibration(request: CalibrationRequest):
     if len(request.predictions) != len(request.labels) or not request.predictions:
         raise HTTPException(400, "predictions and labels must be non-empty arrays of equal length")

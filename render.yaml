@@ -12,13 +12,21 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_ORIGIN
-        sync: false
+        value: http://localhost:3000
       - key: DEMO_MODE_ENABLED
         value: "true"
       - key: PAYPAL_ENV
         value: sandbox
-      - key: ML_ENGINE_URL
-        sync: false
+      - key: ML_ENGINE_HOST
+        fromService:
+          name: ledgerlens-ml
+          type: web
+          property: host
+      - key: ML_ENGINE_PORT
+        fromService:
+          name: ledgerlens-ml
+          type: web
+          property: port
   - type: web
     name: ledgerlens-ml
     runtime: python

@@ -110,7 +110,7 @@ npm run validate
 The repository includes a Vercel client configuration in `vercel.json` and a Render API/ML blueprint in `render.yaml`. This keeps the browser UI and server-side PayPal credentials on separate services. Render free services may sleep and have cold starts; select a paid plan only after reviewing the provider's current pricing and limits.
 
 1. Push the reviewed code to the public GitHub repository. Import it into Vercel with the repository root as the project root. Set `VITE_API_URL` to the Render API URL plus `/api` (for example `https://ledgerlens-api.onrender.com/api`). The Vercel config builds the client and includes SPA route fallback.
-2. In Render, create a Blueprint from `render.yaml`. Set `CLIENT_ORIGIN` to the exact Vercel deployment origin and `ML_ENGINE_URL` to the ML service's HTTPS URL. Never add secrets to Git or `VITE_*` variables.
+2. In Render, create a Blueprint from `render.yaml`. It creates the API and ML services and wires them over Render's private network. After deploying the Vercel site, update `CLIENT_ORIGIN` on the API service to the exact Vercel origin. Never add secrets to Git or `VITE_*` variables.
 3. For server-to-server Sandbox reporting, set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` in the Render API service's secret environment, and keep `PAYPAL_ENV=sandbox`. Reporting permissions must be granted for the configured app; credentials only access the associated PayPal account.
 4. Wait for both Render health checks and visit the Vercel deployment. Sign in to the evidence demo first; it should show source-labeled evidence. Separately verify Sandbox balances and Transaction Search if credentials are configured. A successful evidence demo is not proof of live PayPal access.
 

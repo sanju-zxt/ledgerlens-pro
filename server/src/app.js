@@ -18,6 +18,9 @@ import { getBalances, normalizePayPalBalances } from "./services/paypal.js"
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env") })
 if (process.env.NODE_ENV !== "production" && !process.env.JWT_SECRET) process.env.JWT_SECRET = randomBytes(48).toString("base64url")
+if (process.env.NODE_ENV === "production" && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
+  throw new Error("Production requires a JWT_SECRET of at least 32 characters")
+}
 
 const app = express()
 app.disable("x-powered-by")

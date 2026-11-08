@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | React/Vite client | Login/demo entry, dashboard, ledger, forecast, scenario controls, recurring/anomaly review, settings. | Receives short-lived JWT; never receives PayPal client secret or OAuth token. |
 | Express API | Auth, evidence, dashboard, forecast, scenario, PayPal Reporting calls, analysis routing. | PayPal credentials and OAuth token remain server-side. Protected routes require JWT. |
-| PayPal REST API | Sandbox Reporting balances and transaction search through OAuth 2.0 Client Credentials. | Requires app permissions and Sandbox credentials; current Sandbox requests are returning `403 NOT_AUTHORIZED`. |
+| PayPal REST API | Sandbox Reporting balances and transaction search through OAuth 2.0 Client Credentials. | The deployed API and ML services are healthy. PayPal credentials have not been configured on the hosted API, so current hosted Reporting access is unverified. Previous local calls do not prove current hosted authorization. |
 | FastAPI ML service | Seeded NumPy Monte Carlo endpoint, Isolation Forest anomaly endpoint, calibration metrics. | Analysis endpoints require a shared server-only key in production; outputs are estimates/signals, not facts or fraud decisions. |
 | Evidence fixtures | Read-only CSV/JSON transactions, independent balance snapshot, model evidence, manifest. | Explicitly labeled `SANDBOX_EVIDENCE`; not a connected PayPal merchant account. |
 

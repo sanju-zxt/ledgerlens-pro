@@ -1,0 +1,13 @@
+﻿{
+  "balances": [
+    {
+      "currency": "USD",
+      "total_balance": { "currency_code": "USD", "value": "3500.00" },
+      "available_balance": { "currency_code": "USD", "value": "3482.56" },
+      "withheld_balance": { "currency_code": "USD", "value": "17.44" }
+    }
+  ],
+  "account_id": "sandbox-merchant@ledgerlens.dev",
+  "as_of_time": "2026-10-15T11:02:30Z",
+  "last_refresh_time": "2026-10-15T11:02:30Z"
+}

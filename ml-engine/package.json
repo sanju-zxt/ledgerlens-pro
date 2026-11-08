@@ -1,0 +1,9 @@
+﻿{
+  "name": "ledgerlens-ml",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "python main.py",
+    "dev": "uvicorn main:app --reload --port 8001",
+    "test": "pytest tests/ -v"
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "name": "ledgerlens-pro",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["client", "server", "ml-engine"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "validate": "powershell -File validate.ps1",
+    "manifest": "node generate-manifest.cjs"
+  },
+  "devDependencies": { "concurrently": "^8.2.2" }
+}

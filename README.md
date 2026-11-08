@@ -24,31 +24,37 @@ The current API forecast uses a seeded JavaScript Monte Carlo engine so the dash
 
 ## Setup
 
-Requirements: Node.js 20.19+ (or 22.12+), Python 3.10+, npm, and PowerShell for the manifest validator.
+Requirements: Node.js 20.19+ (or 22.12+), Python 3.10+, and npm. PowerShell is needed only for the optional manifest validator on Windows.
 
 ```powershell
 npm install
-Copy-Item .env.example .env
+python -m pip install -r ml-engine/requirements.txt
+npm run dev:all
 ```
 
-Set `JWT_SECRET` to a random value of at least 32 bytes. Generate a bcrypt password hash with:
+Open <http://localhost:3000/login> and choose **Explore the sandbox demo**. This creates a short-lived local session and uses only the checked-in, labeled evidence fixture. It does not access a PayPal account. The API and ML service run on ports 4000 and 8001.
+
+### Optional PayPal Sandbox connection
+
+To query your own Sandbox app, open PayPal Developer Dashboard → Apps & Credentials → Sandbox. Select a REST API app and enable **Transaction Search**. Add that app's Sandbox Client ID and Secret to the server's local `.env` file:
+
+```env
+PAYPAL_ENV=sandbox
+PAYPAL_CLIENT_ID=your_sandbox_client_id
+PAYPAL_CLIENT_SECRET=your_sandbox_client_secret
+```
+
+Restart LedgerLens after editing `.env`. Permission changes can take time to propagate through PayPal OAuth tokens. The evidence demo remains usable while waiting. Use Settings → PayPal Reporting API to check status and request balances. Transaction Search returns data only after Sandbox transactions exist and PayPal makes reporting data available.
+
+### Optional email/password workspace login
+
+The one-click local demo is the recommended evaluation path. To enable configured email/password login, copy `.env.example` to `.env`, set a strong random `JWT_SECRET` of at least 32 characters, and set `DEMO_EMAIL`. Generate a bcrypt password hash with:
 
 ```powershell
 node -e "console.log(require('bcryptjs').hashSync('your-local-demo-password', 12))"
 ```
 
-Put the hash in `DEMO_PASSWORD_HASH`, set `DEMO_EMAIL`, and add sandbox `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` if you want to call PayPal. Reporting credentials are server-side only. `PAYPAL_ENV` defaults to sandbox; use `production` only with live credentials and a merchant account authorized for the requested reporting scopes. The app does not embed default credentials or passwords.
-
-Install Python requirements and run the three services in separate terminals:
-
-```powershell
-python -m pip install -r ml-engine/requirements.txt
-npm run dev:server
-npm run dev:client
-npm run dev --workspace=ledgerlens-ml
-```
-
-Open <http://localhost:3000>. The dashboard and evidence ledger work without PayPal credentials after JWT/demo user configuration. Without PayPal credentials, Settings reports the integration as not configured.
+Put the resulting hash in `DEMO_PASSWORD_HASH`. `.env` is ignored by Git. Do not use production PayPal credentials for the hackathon demo.
 
 ## API outline
 
@@ -86,7 +92,15 @@ npm run validate
 
 `verify_evidence.py` checks sequence and balance reconciliation, backtest window metadata, calibration value ranges, and balance fixture currency consistency. It reports missing raw backtest files as a warning; metadata validation is not independent validation of forecast outcomes.
 
-`npm run manifest` calculates SHA-256 and byte sizes directly from the four checked-in evidence files and records `git rev-parse HEAD`. It does not alter evidence. `npm run validate` verifies the current HEAD, manifest hashes/sizes, and semantic checks. Regenerate the manifest after committing evidence changes so its Git identity matches HEAD.
+`npm run manifest` calculates SHA-256 and byte sizes directly from the four checked-in evidence files and records the current Git commit as its provenance anchor. It does not alter evidence. `npm run validate` verifies that anchor is in the current history, checks the manifest hashes/sizes, and runs semantic checks. Regenerate the manifest after changing evidence files.
+
+## Hackathon materials
+
+- [Requirements and completion status](docs/HACKATHON_REQUIREMENTS.md)
+- [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md)
+- [Architecture and trust boundaries](docs/ARCHITECTURE.md)
+- [Timed demo script](docs/DEMO_SCRIPT.md)
+- [Tools and model disclosure](docs/TOOLS_AND_MODELS.md)
 
 ## Deployment outline
 

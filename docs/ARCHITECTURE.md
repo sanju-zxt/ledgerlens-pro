@@ -1,0 +1,43 @@
+# LedgerLens Pro architecture
+
+## Components
+
+| Component | Responsibility | Boundary |
+| --- | --- | --- |
+| React/Vite client | Login/demo entry, dashboard, ledger, forecast, scenario controls, recurring/anomaly review, settings. | Receives short-lived JWT; never receives PayPal client secret or OAuth token. |
+| Express API | Auth, evidence, dashboard, forecast, scenario, PayPal Reporting calls, analysis routing. | PayPal credentials and OAuth token remain server-side. Protected routes require JWT. |
+| PayPal REST API | Sandbox Reporting balances and transaction search through OAuth 2.0 Client Credentials. | Requires app permissions and Sandbox credentials; current Sandbox requests are returning `403 NOT_AUTHORIZED`. |
+| FastAPI ML service | Seeded NumPy Monte Carlo endpoint, Isolation Forest anomaly endpoint, calibration metrics. | Receives analysis payloads from Express; outputs estimates/signals, not facts or fraud decisions. |
+| Evidence fixtures | Read-only CSV/JSON transactions, independent balance snapshot, model evidence, manifest. | Explicitly labeled `SANDBOX_EVIDENCE`; not a connected PayPal merchant account. |
+
+## Data flow
+
+```mermaid
+flowchart LR
+  U[Merchant or judge] --> C[React client]
+  C -->|JWT-protected requests| A[Express API]
+  A -->|Fixture mode| E[Read-only evidence files]
+  A -->|OAuth client credentials| P[PayPal Sandbox Reporting]
+  A -->|Forecast and anomaly requests| M[FastAPI / ML engine]
+  E --> A
+  P --> A
+  M --> A
+  A --> C
+```
+
+## Trust and provenance rules
+
+- Demo JWTs are marked `demo`; API guards reject PayPal live-source requests for those sessions. Demo balances and movements come from fixture files only.
+- Configured PayPal credentials belong in the API server's ignored `.env` or a deployment secret manager. Never expose them through `VITE_*` variables, client responses, logs, screenshots, or Git history.
+- PayPal Reporting values retain source and retrieval provenance. The evidence movement ledger and the PayPal balance snapshot remain separate; no snapshot is silently added to the ledger.
+- Financial arithmetic in fixture reconciliation uses Decimal.js. Forecast values are simulation outputs, not ledger facts.
+- Anomaly scores are investigation prompts. They do not confirm fraud or trigger automated action.
+- API production use still needs durable persistence, tested ownership boundaries, webhook signature verification, and a real merchant authorization model.
+
+## Local services
+
+- Client: `http://localhost:3000`
+- Express API: `http://localhost:4000/api`
+- ML service: `http://localhost:8001`
+
+`npm run dev:all` launches the three processes after Node and Python dependencies are installed.

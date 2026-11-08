@@ -3,7 +3,11 @@ $manifest = Get-Content "manifest.json" -Raw | ConvertFrom-Json
 
 $git = (git rev-parse HEAD).Trim()
 if ($git -notmatch "^[0-9a-f]{40}$") { throw "Invalid Git commit format" }
-if ($git -ne $manifest.git) { throw "Git commit mismatch" }
+if ($manifest.git -notmatch "^[0-9a-f]{40}$") { throw "Invalid manifest commit format" }
+git cat-file -e "$($manifest.git)^{commit}"
+if ($LASTEXITCODE -ne 0) { throw "Manifest commit is not present in this repository" }
+git merge-base --is-ancestor $manifest.git $git
+if ($LASTEXITCODE -ne 0) { throw "Manifest evidence is not anchored to this repository history" }
 
 $requiredEvidence = @(
     "evidence/balance_logs.csv",

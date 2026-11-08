@@ -29,6 +29,15 @@ router.post("/login", limitLoginAttempts, async (req, res) => {
   } catch { res.status(500).json({ message: "Login failed" }); }
 });
 
-router.get("/me", authenticateToken, (req, res) => res.json({ id: req.user.userId, email: req.user.email }));
+router.post("/demo", limitLoginAttempts, (req, res) => {
+  const demoEnabled = process.env.DEMO_MODE_ENABLED === "true" || process.env.NODE_ENV !== "production";
+  if (!demoEnabled || process.env.PAYPAL_ENV === "production") return res.status(404).json({ message: "Demo access is disabled" });
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) return res.status(503).json({ message: "Authentication is not configured" });
+  const user = { userId: "sandbox-demo", email: "demo@ledgerlens.local", demo: true };
+  const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "2h", issuer: "ledgerlens-pro", audience: "ledgerlens-client" });
+  res.json({ token, user: { id: user.userId, email: user.email, demo: true } });
+});
+
+router.get("/me", authenticateToken, (req, res) => res.json({ id: req.user.userId, email: req.user.email, demo: Boolean(req.user.demo) }));
 
 export default router;

@@ -1,9 +1,11 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { api } from "../services/api"
+import { useAuth } from "../hooks/useAuth"
 
 export default function Anomalies() {
-  const [source, setSource] = useState("paypal")
+  const { user } = useAuth()
+  const [source, setSource] = useState(user?.demo ? "evidence" : "paypal")
   const analyze = useMutation({ mutationFn: async () => {
     const ledger = await api.get(`/transactions?limit=100${source === "paypal" ? "&source=paypal" : ""}`)
     return api.post("/analysis/anomalies", { transactions: ledger.data, source: ledger.source })

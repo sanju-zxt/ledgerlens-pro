@@ -12,8 +12,10 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { readLedgerEvidence } from "./services/ledger.js"
 import { errorHandler } from "./middleware/auth.js"
+import { randomBytes } from "node:crypto"
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env") })
+if (process.env.NODE_ENV !== "production" && !process.env.JWT_SECRET) process.env.JWT_SECRET = randomBytes(48).toString("base64url")
 
 const app = express()
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:3000" }))

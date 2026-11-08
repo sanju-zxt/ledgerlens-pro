@@ -12,6 +12,7 @@ router.get("/", async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const live = req.query.source === "paypal";
+    if (live && req.user.demo) return res.status(403).json({ message: "Demo sessions can access only labeled sandbox evidence." });
     const data = live ? await listTransactions({ startDate: req.query.start_date, endDate: req.query.end_date }) : readLedgerEvidence().transactions;
     res.json({ data: data.slice((page - 1) * limit, page * limit), total: data.length, page, limit, source: live ? "PAYPAL_TRANSACTION_SEARCH" : "SANDBOX_EVIDENCE", retrieved_at: new Date().toISOString() });
   } catch (error) { next(error); }

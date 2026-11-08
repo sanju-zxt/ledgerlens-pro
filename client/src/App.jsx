@@ -10,6 +10,8 @@ const Settings = lazy(() => import("./pages/Settings"))
 const Recurring = lazy(() => import("./pages/Recurring"))
 const Anomalies = lazy(() => import("./pages/Anomalies"))
 const Insights = lazy(() => import("./pages/Insights"))
+const ModelQuality = lazy(() => import("./pages/ModelQuality"))
+const Updates = lazy(() => import("./pages/Updates"))
 const Login = lazy(() => import("./pages/Login"))
 import "./index.css"
 
@@ -32,6 +34,8 @@ function App() {
               <Route path="/recurring" element={<Recurring />} />
               <Route path="/anomalies" element={<Anomalies />} />
               <Route path="/insights" element={<Insights />} />
+              <Route path="/model-quality" element={<ModelQuality />} />
+              <Route path="/updates" element={<Updates />} />
             </Route>
           </Routes></Suspense>
         </BrowserRouter>

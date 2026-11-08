@@ -12,7 +12,17 @@ class ForecastTests(unittest.TestCase):
         result = asyncio.run(forecast(ForecastRequest(current_balance=1100, payment_amount=0, daily_expense_mean=0, daily_expense_std=0, simulations=100, emergency_probability=0)))
         self.assertEqual(result["reserve_breach_probability"], 0.0)
         self.assertEqual(result["ending_below_reserve_probability"], 0.0)
-        self.assertEqual(result["p15"], result["p85"])
+        self.assertEqual(result["ending_balance"]["p15"], result["ending_balance"]["p85"])
+
+    def test_negative_opening_balance_is_supported_and_counts_as_day_zero_breach(self):
+        request = ForecastRequest(current_balance=-25, payment_amount=0, daily_expense_mean=0, daily_expense_std=0, simulations=100, emergency_probability=0)
+        result = asyncio.run(forecast(request))
+        self.assertEqual(result["reserve_runway_days_p50"], 0)
+        self.assertEqual(result["reserve_breach_probability"], 1.0)
+
+    def test_runway_is_not_reported_when_fewer_than_half_the_paths_breach(self):
+        request = ForecastRequest(current_balance=5000, payment_amount=0, daily_expense_mean=0, daily_expense_std=0, simulations=100, emergency_probability=0)
+        self.assertIsNone(asyncio.run(forecast(request))["reserve_runway_days_p50"])
 
 
 class CalibrationTests(unittest.TestCase):
@@ -21,6 +31,9 @@ class CalibrationTests(unittest.TestCase):
         self.assertAlmostEqual(result["brier_score"], 0.01)
         self.assertAlmostEqual(result["ece"], 0.1)
         self.assertEqual(sum(item["count"] for item in result["reliability_bins"]), 2)
+        self.assertEqual(result["baseline_brier_score"], 0.25)
+        self.assertAlmostEqual(result["brier_skill_score"], 0.96)
+        self.assertEqual(len(result["reliability_bins"]), 10)
 
 
 class AnomalyTests(unittest.TestCase):

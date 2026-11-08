@@ -27,6 +27,33 @@ export async function getBalances(asOfTime) {
   return { ...data, provenance: { endpoint: "/v1/reporting/balances", environment: process.env.PAYPAL_ENV === "production" ? "production" : "sandbox", retrieved_at: new Date().toISOString(), freshness_note: "PayPal states balances may take up to three hours to appear." } };
 }
 
+export function normalizePayPalBalances(response) {
+  if (!Array.isArray(response?.balances)) throw Object.assign(new Error("PayPal returned a balance response without a balances list"), { status: 502 });
+  return response.balances.map((balance) => ({
+    currency: balance.currency || balance.available_balance?.currency_code || balance.total_balance?.currency_code || null,
+    available_balance: balance.available_balance?.value ?? null,
+    total_balance: balance.total_balance?.value ?? null,
+    withheld_balance: balance.withheld_balance?.value ?? null
+  }));
+}
+
+export function selectAvailablePayPalBalance(response, currencyCode) {
+  const balances = normalizePayPalBalances(response);
+  if (!balances.length) throw Object.assign(new Error("PayPal returned no currency balances"), { status: 404 });
+  let selected;
+  if (currencyCode) {
+    const requested = String(currencyCode).trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(requested)) throw Object.assign(new Error("currency_code must be a three-letter ISO currency code"), { status: 400 });
+    selected = balances.find(balance => balance.currency === requested);
+    if (!selected) throw Object.assign(new Error(`PayPal has no ${requested} balance. Available currencies: ${balances.map(balance => balance.currency).join(", ")}`), { status: 400 });
+  } else if (balances.length === 1) selected = balances[0];
+  else throw Object.assign(new Error(`Choose a currency before forecasting. Available currencies: ${balances.map(balance => balance.currency).join(", ")}`), { status: 400 });
+
+  const amount = Number(selected.available_balance);
+  if (!Number.isFinite(amount)) throw Object.assign(new Error(`PayPal did not return an available balance for ${selected.currency}; refusing to substitute total or withheld funds`), { status: 502 });
+  return { amount, currency: selected.currency, as_of: response.last_refresh_time || response.as_of_time || null, source: "PAYPAL_REPORTING_AVAILABLE_BALANCE" };
+}
+
 export async function listTransactions({ startDate, endDate } = {}) {
   const now = new Date();
   const end = endDate || now.toISOString();
@@ -51,7 +78,7 @@ export async function listTransactions({ startDate, endDate } = {}) {
       records.push({
         id: info.transaction_id,
         date: info.transaction_initiation_date,
-        description: info.transaction_subject || item.payer_info?.payer_name?.alternate_full_name || "PayPal transaction",
+        description: info.transaction_subject || "PayPal transaction",
         amount: amount.value,
         currency: amount.currency_code,
         type: Number(amount.value) < 0 ? "DEBIT" : "CREDIT",

@@ -7,9 +7,11 @@
 - The included balance ledger is a small **sandbox evidence fixture**, dated October 15, 2026. It is not a connected merchant account.
 - The example sequence reconciles independently: $3,500.00 opening + $3,500.00 credit − $17.44 debit = $6,982.56. The evidence calls the debit a movement; it does not prove that it is a PayPal fee.
 - The captured PayPal balance response is a distinct snapshot showing $3,500.00 total, $3,482.56 available, and $17.44 withheld. It is not added to the ledger movements.
-- Forecasts are simulations. The dashboard’s illustrative $3,500 future inflow is based on a prior sandbox credit and is **not** a scheduled or verified payment.
+- Forecasts are simulations. Baseline future income is zero; optional scenario receipts are explicitly hypothetical. Expense and emergency distributions are generic assumptions, not learned from a merchant's ledger.
 - Backtest metadata contains 12 consecutive windows. Its referenced raw outcome files are absent, so results cannot be independently reproduced or used to substantiate performance claims.
 - Calibration data has 646 rows. `python verify_evidence.py` calculates the checked-in set’s metrics; do not substitute the unverified metrics quoted in prior notes.
+- The calibration labels in the checked-in file are all negative. The UI computes Brier and equal-width ECE from those rows; prevalence-baseline Brier is zero, so Brier skill is undefined and the file does not measure positive-event performance.
+- The workspace includes a collapsible navigation menu, a model-quality page, and a build-update page. These show checked-in evidence, current configuration state, or actual shipped feature notes; they do not invent merchant activity or live PayPal connection status.
 
 ## Architecture
 
@@ -20,7 +22,7 @@
 | ML service | FastAPI, NumPy PCG64, scikit-learn Isolation Forest | 8001 |
 | Evidence | Read-only CSV/JSON fixtures and SHA-256 manifest | — |
 
-The current API forecast uses a seeded JavaScript Monte Carlo engine so the dashboard works without Python. The separate FastAPI service exposes the independently configurable Monte Carlo, anomaly, and calibration endpoints. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented.
+The current API forecast uses a seeded JavaScript Monte Carlo engine so the dashboard works without Python. The separate FastAPI service exposes the independently configurable Monte Carlo, anomaly, and calibration endpoints. Configured PayPal credentials can load Reporting balances and Transaction Search for the account associated with that app. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented; this is not yet a multi-merchant SaaS product.
 
 ## Setup
 
@@ -36,7 +38,7 @@ Open <http://localhost:3000/login> and choose **Explore the sandbox demo**. This
 
 ### Optional PayPal Sandbox connection
 
-To query your own Sandbox app, open PayPal Developer Dashboard → Apps & Credentials → Sandbox. Select a REST API app and enable **Transaction Search**. Add that app's Sandbox Client ID and Secret to the server's local `.env` file:
+To query the PayPal account associated with your Sandbox app, open PayPal Developer Dashboard → Apps & Credentials → Sandbox. Select a REST API app and enable the needed Reporting permissions. Add that app's Sandbox Client ID and Secret to the server's local `.env` file:
 
 ```env
 PAYPAL_ENV=sandbox
@@ -44,7 +46,7 @@ PAYPAL_CLIENT_ID=your_sandbox_client_id
 PAYPAL_CLIENT_SECRET=your_sandbox_client_secret
 ```
 
-Restart LedgerLens after editing `.env`. Permission changes can take time to propagate through PayPal OAuth tokens. The evidence demo remains usable while waiting. Use Settings → PayPal Reporting API to check status and request balances. Transaction Search returns data only after Sandbox transactions exist and PayPal makes reporting data available.
+Restart LedgerLens after editing `.env`. Use Settings → PayPal Reporting API to check status and request balances. Transaction Search returns data only after Sandbox transactions exist and PayPal makes reporting data available. Credentials grant access associated with the PayPal app owner; they do not let an arbitrary merchant connect their own account. A real third-party merchant connection requires an approved PayPal partner/onboarding flow.
 
 ### Optional email/password workspace login
 
@@ -66,15 +68,16 @@ Protected API routes require `Authorization: Bearer <token>`:
 | GET | `/api/auth/me` | Validate current session |
 | GET | `/api/transactions?limit=50&page=1` | Sandbox evidence; `source=paypal` requests live Transaction Search |
 | GET | `/api/transactions/reconciliation` | Decimal-based fixture reconciliation |
-| GET | `/api/forecast` | Deterministic 30-day Monte Carlo forecast |
+| GET | `/api/forecast` | Deterministic 30-day Monte Carlo forecast, including separate any-day/ending reserve risks and Wilson intervals |
 | POST | `/api/forecast/simulate` | Run an illustrative income-delay/emergency/savings scenario |
+| GET | `/api/analysis/calibration` | Calculate calibration metrics from checked-in labeled rows |
 | GET | `/api/paypal/status` | Credential configuration status |
 | GET | `/api/paypal/balances` | PayPal Reporting balance snapshot, with retrieval provenance |
 | GET | `/api/analysis/recurring?source=paypal` | Rule-based recurring pattern candidates |
 | POST | `/api/analysis/anomalies` | Forward transaction batch to the Python Isolation Forest service |
 | GET | `/api/evidence/:name` | Read-only access to allowlisted evidence files |
 | GET | `/api/evidence/manifest` | Read current SHA-256 manifest |
-| GET | `/api/dashboard/summary` | Fixture balance used by the dashboard |
+| GET | `/api/dashboard/summary` | Evidence balance in demo mode or PayPal available balances for the credential-owning account |
 
 ML service endpoints: `GET /health`, `POST /forecast`, `POST /anomaly`, and `POST /calibration` on port 8001. Forecast and anomaly results are estimates and statistical signals, not observations or confirmed fraud.
 
@@ -102,20 +105,20 @@ npm run validate
 - [Timed demo script](docs/DEMO_SCRIPT.md)
 - [Tools and model disclosure](docs/TOOLS_AND_MODELS.md)
 
-## Deployment outline
+## Deployment
 
-For a static client plus API and ML services (for example, separate Render services):
+The repository includes a Vercel client configuration in `vercel.json` and a Render API/ML blueprint in `render.yaml`. This keeps the browser UI and server-side PayPal credentials on separate services. Render free services may sleep and have cold starts; select a paid plan only after reviewing the provider's current pricing and limits.
 
-1. **Client static site:** repository root as the build context; build with `npm ci && npm run build`; publish `client/dist`. Set `VITE_API_URL` at build time to the API origin plus `/api` (for example `https://ledgerlens-api.example.com/api`). Configure an SPA rewrite to `/index.html`.
-2. **Express API:** repository root as the build context; start with `npm run start --workspace=server`. Set `PORT`, `CLIENT_ORIGIN`, `JWT_SECRET`, `DEMO_EMAIL`, `DEMO_PASSWORD_HASH`, `PAYPAL_ENV`, and the PayPal client credentials. Set `ML_ENGINE_URL` to the reachable ML service URL.
-3. **FastAPI ML service:** use `ml-engine` as the service root; install `-r requirements.txt`; start with `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`.
-4. **Verify:** use the provider health checks, confirm login, and test PayPal Sandbox credentials and required Reporting scopes. The evidence fixture is not a substitute for live Sandbox validation.
+1. Push the reviewed code to the public GitHub repository. Import it into Vercel with the repository root as the project root. Set `VITE_API_URL` to the Render API URL plus `/api` (for example `https://ledgerlens-api.onrender.com/api`). The Vercel config builds the client and includes SPA route fallback.
+2. In Render, create a Blueprint from `render.yaml`. Set `CLIENT_ORIGIN` to the exact Vercel deployment origin and `ML_ENGINE_URL` to the ML service's HTTPS URL. Never add secrets to Git or `VITE_*` variables.
+3. For server-to-server Sandbox reporting, set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` in the Render API service's secret environment, and keep `PAYPAL_ENV=sandbox`. Reporting permissions must be granted for the configured app; credentials only access the associated PayPal account.
+4. Wait for both Render health checks and visit the Vercel deployment. Sign in to the evidence demo first; it should show source-labeled evidence. Separately verify Sandbox balances and Transaction Search if credentials are configured. A successful evidence demo is not proof of live PayPal access.
 
-Use HTTPS for every public service. Store secrets in the hosting provider’s environment manager. Do not deploy with the example JWT secret or demo hash placeholders. Webhooks and durable ledger storage must be added before relying on this deployment for balance updates.
+The blueprint is configured for Render's free web-service tier to avoid silently selecting a paid plan. Review current service limits before using it for an important demo. This deployment remains a single-app/account integration, not a multi-merchant SaaS: persistent user accounts, tenant isolation, merchant OAuth onboarding, durable ledger storage, and signed webhook processing are not implemented.
 
 ## Security and production readiness
 
-- Configure a strong JWT secret and bcrypt password hash. Auth is intentionally unavailable until configured.
+- Configure a strong JWT secret and bcrypt password hash. Auth is intentionally unavailable until configured. Authentication is currently one configured account, uses a browser-held bearer token, and rate limiting is process-local; it is not suitable for public multi-user production deployment.
 - Store PayPal secrets only in the server environment; never commit `.env` or expose tokens to the client.
 - The PayPal integration uses server-to-server reporting credentials, not merchant OAuth consent. It cannot grant universal access to third-party merchant accounts.
 - No webhook endpoint is enabled: reliable webhook signature verification, event deduplication, and append-only durable storage require a configured webhook ID and persistent database, which are not present in this repository.
@@ -123,13 +126,13 @@ Use HTTPS for every public service. Store secrets in the hosting provider’s en
 
 ## Three-minute demo script
 
-1. **0:00–0:30 — Ground the data.** Show the Dashboard badge and explain that the visible balance comes from dated sandbox evidence, not a live merchant account.
+1. **0:00–0:30 — Ground the data.** Show the Dashboard source badge. If PayPal calls succeed, explain that the data belongs to the account associated with the configured app credentials; otherwise use the labeled evidence demo.
 2. **0:30–1:00 — Reconcile.** Open Transactions and trace the $3,500 opening, $3,500 credit, $17.44 debit, and $6,982.56 closing in the evidence file. Mention the separate balance API snapshot.
-3. **1:00–1:40 — Explore uncertainty.** Open Forecast and explain the 10,000 seeded paths, 15th–85th percentile range, reserve-breach probability, and illustrative future-inflow assumption.
-4. **1:40–2:15 — Simulate a decision.** Change delay, emergency expense, or cost reduction on the Dashboard and run the scenario; explain that outputs are modeled outcomes, not guarantees.
+3. **1:00–1:40 — Explore uncertainty.** Open Forecast and explain the 10,000 seeded paths, 15th–85th percentile range, separate reserve-risk measures, Monte Carlo sampling interval, and illustrative future-inflow assumption.
+4. **1:40–2:15 — Simulate a decision.** Change inflow delay, forced emergency expense, or operating-cost reduction on Forecast and run the scenario; explain that outputs are modeled outcomes, not guarantees.
 5. **2:15–2:40 — Review signals.** Show the recurring-obligation rules and explain that anomaly alerts are statistical review prompts, not fraud labels.
 6. **2:40–3:00 — Verify integrity.** Open Settings and run `npm run validate`. State that live Sandbox access requires merchant credentials and that raw backtest source CSVs are not included.
 
 ## Submission assessment
 
-The local prototype has a working UI, configurable server authentication, deterministic forecasting, a server-side PayPal Reporting client, ML endpoints, and integrity checks for supplied files. It is **not production-ready**: persistence, a supported OAuth merchant connection flow, webhook verification, raw backtest outcome data, end-to-end coverage, and live Sandbox validation remain open.
+The local prototype has a working UI, single-account configured authentication, deterministic forecasting, a server-side PayPal Reporting client, ML endpoints, and integrity checks for supplied files. It is **not production-ready**: multi-user identity and tenant isolation, merchant consent/onboarding, persistence, webhook verification, raw backtest outcome data, and deployment/security review remain open. Successful API calls from app credentials prove access for that credential-owning account only.

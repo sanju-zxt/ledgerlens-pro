@@ -2,8 +2,8 @@
 
 ## Before public submission
 
-1. **Confirm PayPal Sandbox Reporting access.** Transaction Search is enabled for the selected Sandbox app, but fresh Reporting calls still return `403 NOT_AUTHORIZED` and the OAuth response currently has no reporting scope. Recheck after PayPal's permission propagation window; if it persists, verify app/credential pairing and ask PayPal support with the returned debug ID. Do not rotate or publish the secret casually.
-2. **Exercise the live path.** Once authorized, create a test transaction between Sandbox buyer and seller accounts, verify the transaction appears through Reporting Search, and record the source label and retrieval time. Verify balances separately; PayPal reporting data can lag.
+1. **Recheck PayPal Sandbox access.** A previous local request succeeded for the account associated with the configured Sandbox app. Recheck balances and Transaction Search immediately before recording; credentials or permissions can change. Never publish credentials.
+2. **Exercise the live path.** Create a test transaction between Sandbox buyer and seller accounts, verify the transaction appears through Reporting Search, and record the source label and retrieval time. Verify balances separately; PayPal reporting data can lag.
 3. **Publish the repository.** Review the staged file list and secret scan, then publish publicly with the root MIT license and README. The local repository currently has no remote.
 4. **Record and publish the demo.** Follow [DEMO_SCRIPT.md](DEMO_SCRIPT.md), keep it under 3 minutes, show the app working, upload publicly to YouTube or Vimeo, and add that URL to the entry.
 5. **Complete the Devpost entry.** Add the project description, features, tools/models, public repository URL, runnable setup instructions, hosted demo URL if available, and public video URL.

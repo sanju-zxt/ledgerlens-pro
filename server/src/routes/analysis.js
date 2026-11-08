@@ -4,9 +4,14 @@ import { authenticateToken } from "../middleware/auth.js";
 import { listTransactions } from "../services/paypal.js";
 import { detectRecurringObligations } from "../services/recurring.js";
 import { readLedgerEvidence } from "../services/ledger.js";
+import { readCalibrationEvidence } from "../services/calibration.js";
 
 const router = express.Router();
 router.use(authenticateToken);
+
+router.get("/calibration", (req, res, next) => {
+  try { res.json(readCalibrationEvidence()); } catch (error) { next(error); }
+});
 
 router.get("/recurring", async (req, res, next) => {
   try {

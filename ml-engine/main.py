@@ -4,7 +4,6 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import brier_score_loss
 
 app = FastAPI(title="LedgerLens ML Engine", version="1.0.0")
 
@@ -18,19 +17,19 @@ class Transaction(BaseModel):
 
 
 class ForecastRequest(BaseModel):
-    current_balance: float = Field(ge=0)
-    payment_amount: float = Field(default=3500.0, ge=0)
+    current_balance: float = Field(allow_inf_nan=False)
+    payment_amount: float = Field(default=3500.0, ge=0, allow_inf_nan=False)
     payment_day_start: int = Field(default=7, ge=1, le=90)
     payment_day_end: int = Field(default=13, ge=1, le=90)
-    daily_expense_mean: float = Field(default=78.0, ge=0)
-    daily_expense_std: float = Field(default=15.0, ge=0)
-    reserve_threshold: float = Field(default=1000.0, ge=0)
+    daily_expense_mean: float = Field(default=78.0, ge=0, allow_inf_nan=False)
+    daily_expense_std: float = Field(default=15.0, ge=0, allow_inf_nan=False)
+    reserve_threshold: float = Field(default=1000.0, ge=0, allow_inf_nan=False)
     simulations: int = Field(default=10000, ge=100, le=50000)
     horizon_days: int = Field(default=30, ge=1, le=90)
-    seed: int = 42
-    emergency_probability: float = Field(default=0.05, ge=0, le=1)
-    emergency_min: float = Field(default=200, ge=0)
-    emergency_max: float = Field(default=500, ge=0)
+    seed: int = Field(default=42, ge=0, le=4294967295)
+    emergency_probability: float = Field(default=0.05, ge=0, le=1, allow_inf_nan=False)
+    emergency_min: float = Field(default=200, ge=0, allow_inf_nan=False)
+    emergency_max: float = Field(default=500, ge=0, allow_inf_nan=False)
 
 
 class AnomalyRequest(BaseModel):
@@ -39,8 +38,8 @@ class AnomalyRequest(BaseModel):
 
 
 class CalibrationRequest(BaseModel):
-    predictions: List[float]
-    labels: List[int]
+    predictions: List[float] = Field(max_length=100000)
+    labels: List[int] = Field(max_length=100000)
     bins: int = Field(default=10, ge=2, le=50)
 
 
@@ -78,14 +77,31 @@ async def forecast(request: ForecastRequest):
         if day == horizon:
             ending_breached = balances < request.reserve_threshold
         series.append({"day": day, "median": float(np.percentile(balances, 50)), "lower_bound": float(np.percentile(balances, 15)), "upper_bound": float(np.percentile(balances, 85))})
+    path_breach_count = int(np.count_nonzero(path_breached))
+    ending_breach_count = int(np.count_nonzero(ending_breached))
+    required_events = int(np.ceil(n * 0.5))
+    observed_breaches = np.sort(first_breach_day[first_breach_day <= horizon])
+    median_runway = int(observed_breaches[required_events - 1]) if len(observed_breaches) >= required_events else None
+
+    def wilson_interval(successes: int) -> dict:
+        z = 1.959963984540054
+        probability = successes / n
+        z2 = z * z
+        denominator = 1 + z2 / n
+        center = (probability + z2 / (2 * n)) / denominator
+        margin = z * np.sqrt(probability * (1 - probability) / n + z2 / (4 * n * n)) / denominator
+        return {"lower": 0.0 if successes == 0 else float(max(0.0, center - margin)), "upper": 1.0 if successes == n else float(min(1.0, center + margin)), "level": 0.95, "method": "Wilson score"}
+
     return {
-        "day_30_mean": float(np.mean(balances)), "day_30_median": float(np.median(balances)),
-        "p15": float(np.percentile(balances, 15)), "p85": float(np.percentile(balances, 85)),
-        "reserve_breach_probability": float(np.mean(path_breached)),
-        "ending_below_reserve_probability": float(np.mean(ending_breached)),
-        "reserve_runway_days_p50": float(np.percentile(first_breach_day, 50)) if np.percentile(first_breach_day, 50) <= horizon else None,
+        "ending_balance": {"mean": float(np.mean(balances)), "median": float(np.median(balances)), "p15": float(np.percentile(balances, 15)), "p85": float(np.percentile(balances, 85))},
+        "reserve_runway_days_p50": median_runway,
+        "reserve_threshold": request.reserve_threshold,
+        "reserve_breach_probability": path_breach_count / n,
+        "reserve_breach_probability_95ci": wilson_interval(path_breach_count),
+        "ending_below_reserve_probability": ending_breach_count / n,
+        "ending_below_reserve_probability_95ci": wilson_interval(ending_breach_count),
         "chart_data": series, "simulations": n, "horizon_days": horizon,
-        "provenance": {"kind": "simulation", "seed": request.seed, "generator": "NumPy PCG64", "assumptions": {"payment_amount": request.payment_amount, "payment_day_range": [request.payment_day_start, request.payment_day_end], "daily_operating_expense": f"Normal({request.daily_expense_mean}, {request.daily_expense_std}), clipped at zero", "emergency_probability_per_path": request.emergency_probability, "emergency_amount_range": [request.emergency_min, request.emergency_max], "same_day_event_order": ["payment", "operating expense", "emergency expense"]}}
+        "provenance": {"kind": "simulation", "method": "Monte Carlo", "seed": request.seed, "generator": "NumPy PCG64", "assumptions": {"payment_amount": request.payment_amount, "payment_day_range": [request.payment_day_start, request.payment_day_end], "daily_operating_expense": f"Normal({request.daily_expense_mean}, {request.daily_expense_std}), clipped at zero", "emergency_probability_per_path": request.emergency_probability, "emergency_amount_range": [request.emergency_min, request.emergency_max], "same_day_event_order": ["payment", "operating expense", "emergency expense"]}}
     }
 
 
@@ -107,7 +123,9 @@ async def calibration(request: CalibrationRequest):
         raise HTTPException(400, "predictions and labels must be non-empty arrays of equal length")
     if any(not 0 <= p <= 1 for p in request.predictions) or any(label not in (0, 1) for label in request.labels):
         raise HTTPException(400, "predictions must be in [0,1] and labels must be binary")
-    p, y = np.asarray(request.predictions), np.asarray(request.labels)
+    p, y = np.asarray(request.predictions, dtype=np.float64), np.asarray(request.labels, dtype=np.float64)
+    if not np.isfinite(p).all():
+        raise HTTPException(400, "predictions must be finite")
     edges = np.linspace(0, 1, request.bins + 1)
     bins = []
     ece = 0.0
@@ -116,8 +134,13 @@ async def calibration(request: CalibrationRequest):
         if mask.any():
             confidence, rate = float(p[mask].mean()), float(y[mask].mean())
             ece += float(mask.mean()) * abs(confidence - rate)
-            bins.append({"lower": float(edges[i]), "upper": float(edges[i + 1]), "count": int(mask.sum()), "mean_prediction": confidence, "observed_rate": rate})
-    return {"brier_score": float(brier_score_loss(y, p)), "ece": float(ece), "n_samples": len(p), "reliability_bins": bins}
+        else:
+            confidence, rate = None, None
+        bins.append({"lower": float(edges[i]), "upper": float(edges[i + 1]), "count": int(mask.sum()), "mean_prediction": confidence, "observed_rate": rate})
+    brier = float(np.mean((p - y) ** 2))
+    prevalence = float(y.mean())
+    baseline_brier = float(np.mean((prevalence - y) ** 2))
+    return {"brier_score": brier, "baseline_brier_score": baseline_brier, "brier_skill_score": 1 - brier / baseline_brier if baseline_brier > 0 else None, "ece": float(ece), "expected_calibration_error": float(ece), "ece_method": "equal-width bins", "positive_rate": prevalence, "positive_count": int(y.sum()), "bins": request.bins, "n_samples": len(p), "reliability_bins": bins}
 
 
 if __name__ == "__main__":

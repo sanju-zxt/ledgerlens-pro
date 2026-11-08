@@ -1,0 +1,27 @@
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "react-router-dom"
+import { api } from "../services/api"
+import { ReliabilityChart } from "../components/ReliabilityChart"
+
+const percent = value => `${(value * 100).toFixed(1)}%`
+
+export default function ModelQuality() {
+  const query = useQuery({ queryKey: ["calibration-evidence"], queryFn: () => api.get("/analysis/calibration") })
+  if (query.isLoading) return <div role="status" className="card">Calculating calibration from the checked-in labeled evidence…</div>
+  if (query.error) return <div role="alert" className="card text-red-700">{query.error.message}</div>
+  const data = query.data
+  return <section className="model-quality-page">
+    <header><p className="eyebrow">MODEL TRANSPARENCY</p><h1 className="page-title">Calibration & model quality</h1><p className="page-lede">Metrics are calculated directly from the labeled file shown below. They describe that dataset; they do not validate the separate cash-flow forecast.</p></header>
+    <div className="metric-grid calibration-metrics">
+      <article className="metric-card"><div className="metric-top"><span className="metric-title">Brier score</span><span className="metric-icon">Σ</span></div><p className="metric-value">{data.brier_score.toFixed(4)}</p><p className="metric-foot">Mean squared probability error · lower is better</p></article>
+      <article className="metric-card"><div className="metric-top"><span className="metric-title">Equal-width ECE</span><span className="metric-icon">≈</span></div><p className="metric-value">{percent(data.expected_calibration_error)}</p><p className="metric-foot">Weighted mean gap between prediction and event rate · lower is better</p></article>
+      <article className="metric-card"><div className="metric-top"><span className="metric-title">Brier skill vs prevalence</span><span className="metric-icon">↗</span></div><p className="metric-value">{data.brier_skill_score == null ? "N/A" : percent(data.brier_skill_score)}</p><p className="metric-foot">Relative to predicting the dataset's observed event rate</p></article>
+      <article className="metric-card"><div className="metric-top"><span className="metric-title">Labeled observations</span><span className="metric-icon">#</span></div><p className="metric-value">{data.n_samples.toLocaleString()}</p><p className="metric-foot">Positive label rate: {percent(data.positive_rate)}</p></article>
+    </div>
+    <div className="quality-grid">
+      <article className="card"><div className="section-heading"><div><h2>Reliability diagram</h2><p>Points closer to the diagonal are better calibrated within those bins.</p></div></div><ReliabilityChart bins={data.reliability_bins}/></article>
+      <article className="card"><h2 className="text-sm font-bold text-slate-800">How to read these numbers</h2><div className="quality-notes"><p><strong>Brier score:</strong> average squared difference between each probability and its binary label. The baseline is the Brier score from always predicting the observed dataset prevalence.</p><p><strong>Brier skill:</strong> 0 means equal to that baseline; above 0 improves on it; below 0 is worse. It combines calibration and resolution, so it is not a calibration-only measure.</p><p><strong>ECE:</strong> probability predictions are divided into {data.bins} equal-width bins. ECE is the sample-weighted absolute gap between average prediction and observed event rate.</p>{data.positive_count === 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><strong>Dataset limitation:</strong> all {data.n_samples.toLocaleString()} labels are negative. With no positive examples, the prevalence baseline Brier score is zero, so Brier skill is undefined; this file cannot show performance on positive events.</p>}<p><strong>Important:</strong> these metrics apply only to the checked-in labeled calibration rows. The referenced raw backtest outcomes are missing, so cash-flow forecast accuracy cannot be established from this package.</p></div><div className="mt-5 border-t border-slate-100 pt-4"><p className="text-xs text-slate-500">Source: <code>{data.source}</code></p><Link className="subtle-link mt-2 inline-block" to="/settings">Review evidence files →</Link></div></article>
+    </div>
+    <article className="card"><div className="section-heading mb-3"><div><h2>Reliability bins</h2><p>Empty bins are retained and shown with a zero count.</p></div></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th className="p-3">Probability range</th><th className="p-3">Mean predicted</th><th className="p-3">Observed rate</th><th className="p-3">Count</th></tr></thead><tbody>{data.reliability_bins.map(bin => <tr key={`${bin.lower}-${bin.upper}`} className="border-b border-slate-100"><td className="p-3">{percent(bin.lower)}–{percent(bin.upper)}</td><td className="p-3">{bin.mean_prediction == null ? "—" : percent(bin.mean_prediction)}</td><td className="p-3">{bin.observed_rate == null ? "—" : percent(bin.observed_rate)}</td><td className="p-3">{bin.count}</td></tr>)}</tbody></table></div></article>
+  </section>
+}

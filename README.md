@@ -10,7 +10,7 @@
 - Forecasts are simulations. Baseline future income is zero; optional scenario receipts are explicitly hypothetical. Expense and emergency distributions are generic assumptions, not learned from a merchant's ledger.
 - Backtest metadata contains 12 consecutive windows. Its referenced raw outcome files are absent, so results cannot be independently reproduced or used to substantiate performance claims.
 - Calibration data has 646 rows. `python verify_evidence.py` calculates the checked-in set’s metrics; do not substitute the unverified metrics quoted in prior notes.
-- The calibration labels in the checked-in file are all negative. The UI computes Brier and equal-width ECE from those rows; prevalence-baseline Brier is zero, so Brier skill is undefined and the file does not measure positive-event performance.
+- The calibration labels in the checked-in file are all negative. The UI computes Brier, prevalence baseline, equal-width ECE, reliability bins, and class metrics where defined; the zero-prevalence baseline Brier is zero, so Brier skill and positive-event performance cannot be validated on this file.
 - The workspace includes a collapsible navigation menu, a model-quality page, and a build-update page. These show checked-in evidence, current configuration state, or actual shipped feature notes; they do not invent merchant activity or live PayPal connection status.
 
 ## Architecture
@@ -22,7 +22,7 @@
 | ML service | FastAPI, NumPy PCG64, scikit-learn Isolation Forest | 8001 |
 | Evidence | Read-only CSV/JSON fixtures and SHA-256 manifest | — |
 
-The current API forecast uses a seeded JavaScript Monte Carlo engine so the dashboard works without Python. The separate FastAPI service exposes the independently configurable Monte Carlo, anomaly, and calibration endpoints. Configured PayPal credentials can load Reporting balances and Transaction Search for the account associated with that app. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented; this is not yet a multi-merchant SaaS product.
+The Express API's seeded JavaScript Monte Carlo engine is the authoritative forecast used by the dashboard and scenario simulator. The FastAPI forecast endpoint remains an independent reference implementation and is not consumed by the web application; cross-engine bit-for-bit parity is not claimed. The same service provides multi-feature batch anomaly review and calibration calculations. Configured PayPal credentials can load Reporting balances and Transaction Search for the account associated with that app. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented; this is not yet a multi-merchant SaaS product.
 
 ## Setup
 
@@ -60,7 +60,7 @@ Put the resulting hash in `DEMO_PASSWORD_HASH`. `.env` is ignored by Git. Do not
 
 ## API outline
 
-Protected API routes require `Authorization: Bearer <token>`:
+Protected API routes use a short-lived HttpOnly session cookie in the web client:
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ Protected API routes require `Authorization: Bearer <token>`:
 | GET | `/api/evidence/manifest` | Read current SHA-256 manifest |
 | GET | `/api/dashboard/summary` | Evidence balance in demo mode or PayPal available balances for the credential-owning account |
 
-ML service endpoints: `GET /health`, `POST /forecast`, `POST /anomaly`, and `POST /calibration` on port 8001. Forecast and anomaly results are estimates and statistical signals, not observations or confirmed fraud.
+ML service endpoints: `GET /health`, `POST /forecast` (reference only; zero future-income default), `POST /anomaly`, and `POST /calibration` on port 8001. Forecast and anomaly results are estimates and statistical signals, not observations or confirmed fraud. Web sessions use an HttpOnly cookie; the server also accepts legacy bearer tokens but does not return tokens to browser code.
 
 PayPal reporting balances can lag; PayPal documents that balances may take up to three hours to appear. Transaction Search uses OAuth 2.0 client credentials and requests are limited to a 31-day window. Pagination is bounded and results are deduplicated by PayPal transaction ID. See [Transaction Search API](https://developer.paypal.com/docs/api/transaction-search/v1/) and [PayPal Reporting balances](https://developer.paypal.com/api/transaction-search/v1/balances-get/).
 
@@ -93,7 +93,7 @@ npm run manifest
 npm run validate
 ```
 
-`verify_evidence.py` checks sequence and balance reconciliation, backtest window metadata, calibration value ranges, and balance fixture currency consistency. It reports missing raw backtest files as a warning; metadata validation is not independent validation of forecast outcomes.
+`verify_evidence.py` checks evidence manifest hashes/sizes, sequence and balance reconciliation, backtest metadata schema/window continuity, calibration values and class distribution, and balance fixture currency consistency. It reports missing raw backtest files and undocumented timestamp semantics; metadata validation is not independent validation of forecast outcomes. If a raw backtest file is supplied, it must match the documented forecast outcome schema and pass duplicate, date, finite-value, interval-order and currency checks.
 
 `npm run manifest` calculates SHA-256 and byte sizes directly from the four checked-in evidence files and records the current Git commit as its provenance anchor. It does not alter evidence. `npm run validate` verifies that anchor is in the current history, checks the manifest hashes/sizes, and runs semantic checks. Regenerate the manifest after changing evidence files.
 
@@ -102,6 +102,7 @@ npm run validate
 - [Requirements and completion status](docs/HACKATHON_REQUIREMENTS.md)
 - [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md)
 - [Architecture and trust boundaries](docs/ARCHITECTURE.md)
+- [Evidence methodology and backtest format](docs/EVIDENCE_METHODOLOGY.md)
 - [Timed demo script](docs/DEMO_SCRIPT.md)
 - [Tools and model disclosure](docs/TOOLS_AND_MODELS.md)
 
@@ -109,7 +110,7 @@ npm run validate
 
 The repository includes a Vercel client configuration in `vercel.json` and a Render API/ML blueprint in `render.yaml`. This keeps the browser UI and server-side PayPal credentials on separate services. Render free services may sleep and have cold starts; select a paid plan only after reviewing the provider's current pricing and limits.
 
-1. Push the reviewed code to the public GitHub repository. Import it into Vercel with the repository root as the project root. Set `VITE_API_URL` to the Render API URL plus `/api` (for example `https://ledgerlens-api.onrender.com/api`). The Vercel config builds the client and includes SPA route fallback.
+1. Push the reviewed code to the public GitHub repository. Import it into Vercel with the repository root as the project root. The Vercel config proxies same-origin `/api/*` requests to the Render API and provides SPA route fallback; the browser does not need a cross-site API URL.
 2. In Render, create a Blueprint from `render.yaml`. It creates the API and ML services and protects the ML HTTPS endpoint with a shared secret generated by Render. The Blueprint allows the deployed Vercel origin for browser API calls. If you change the Vercel domain, update `CLIENT_ORIGIN` accordingly. Never add secrets to Git or `VITE_*` variables.
 3. For server-to-server Sandbox reporting, set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` in the Render API service's secret environment, and keep `PAYPAL_ENV=sandbox`. Reporting permissions must be granted for the configured app; credentials only access the associated PayPal account.
 4. Wait for both Render health checks and visit the Vercel deployment. Sign in to the evidence demo first; it should show source-labeled evidence. Separately verify Sandbox balances and Transaction Search if credentials are configured. A successful evidence demo is not proof of live PayPal access.
@@ -118,7 +119,7 @@ The blueprint is configured for Render's free web-service tier to avoid silently
 
 ## Security and production readiness
 
-- Configure a strong JWT secret and bcrypt password hash. Auth is intentionally unavailable until configured. Authentication is currently one configured account, uses a browser-held bearer token, and rate limiting is process-local; it is not suitable for public multi-user production deployment.
+- Configure a strong JWT secret and bcrypt password hash. Auth is intentionally unavailable until configured. Web sessions use a short-lived HttpOnly, Secure, SameSite=Lax cookie in production and origin checks on state-changing requests. Logout clears the cookie, but stateless JWTs cannot be revoked before expiry. Authentication is still one configured account, rate limiting is process-local, and the app has no tenant isolation; it is not suitable for public multi-user production deployment.
 - Store PayPal secrets only in the server environment; never commit `.env` or expose tokens to the client.
 - The PayPal integration uses server-to-server reporting credentials, not merchant OAuth consent. It cannot grant universal access to third-party merchant accounts.
 - No webhook endpoint is enabled: reliable webhook signature verification, event deduplication, and append-only durable storage require a configured webhook ID and persistent database, which are not present in this repository.

@@ -13,7 +13,7 @@ router.get("/", async (req, res, next) => {
       ? (() => { const ledger = readLedgerEvidence(); return { amount: ledger.closingBalance.toNumber(), currency: ledger.currency, source: "SANDBOX_EVIDENCE", as_of: ledger.asOf }; })()
       : selectAvailablePayPalBalance(await getBalances(), req.query.currency_code);
     const result = forecastCashflow({ currentBalance: sourceBalance.amount, paymentAmount: 0 });
-    res.json({ ...result, trend: null, source_balance: sourceBalance });
+    res.json({ ...result, model_metadata: { model: "ledgerlens-scenario-monte-carlo", version: "1.0.0", authoritative_for_dashboard: true, generated_at: new Date().toISOString() }, trend: null, source_balance: sourceBalance });
   } catch (error) { next(error); }
 });
 
@@ -28,7 +28,7 @@ router.post("/simulate", async (req, res, next) => {
       ? (() => { const ledger = readLedgerEvidence(); return { amount: ledger.closingBalance.toNumber(), currency: ledger.currency, source: "SANDBOX_EVIDENCE", as_of: ledger.asOf }; })()
       : selectAvailablePayPalBalance(await getBalances(), currency_code);
     const result = forecastCashflow({ currentBalance: sourceBalance.amount, paymentAmount: expected_income, paymentDays: [7 + delay_days, 13 + delay_days], emergencyProbability: emergency_amount > 0 ? 1 : 0.05, dailyExpenseMean: Math.max(0, 78 - cost_reduction / 30), emergencyAmount: emergency_amount > 0 ? [emergency_amount, emergency_amount] : [200, 500] });
-    res.json({ ...result, scenario_applied: { delay_days, expected_income, emergency_amount, cost_reduction }, source_balance: sourceBalance });
+    res.json({ ...result, model_metadata: { model: "ledgerlens-scenario-monte-carlo", version: "1.0.0", authoritative_for_dashboard: true, generated_at: new Date().toISOString() }, scenario_applied: { delay_days, expected_income, emergency_amount, cost_reduction }, source_balance: sourceBalance });
   } catch (error) { next(error); }
 });
 

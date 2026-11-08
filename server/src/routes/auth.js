@@ -5,6 +5,15 @@ import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 const attempts = new Map();
+const sessionCookie = "ledgerlens_session";
+function setSessionCookie(res, token) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure; SameSite=Lax" : "; SameSite=Lax";
+  res.setHeader("Set-Cookie", `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=7200${secure}`);
+}
+function clearSessionCookie(res) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure; SameSite=Lax" : "; SameSite=Lax";
+  res.setHeader("Set-Cookie", `${sessionCookie}=; HttpOnly; Path=/; Max-Age=0${secure}`);
+}
 function limitLoginAttempts(req, res, next) {
   const key = req.ip || "unknown";
   const now = Date.now();
@@ -25,7 +34,8 @@ router.post("/login", limitLoginAttempts, async (req, res) => {
     if (!matches) return res.status(401).json({ message: "Invalid credentials" });
     const user = { userId: "configured-demo-user", email: process.env.DEMO_EMAIL };
     const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "2h", issuer: "ledgerlens-pro", audience: "ledgerlens-client" });
-    res.json({ token, user: { id: user.userId, email: user.email } });
+    setSessionCookie(res, token);
+    res.json({ user: { id: user.userId, email: user.email } });
   } catch { res.status(500).json({ message: "Login failed" }); }
 });
 
@@ -35,9 +45,11 @@ router.post("/demo", limitLoginAttempts, (req, res) => {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) return res.status(503).json({ message: "Authentication is not configured" });
   const user = { userId: "sandbox-demo", email: "demo@ledgerlens.local", demo: true };
   const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: "2h", issuer: "ledgerlens-pro", audience: "ledgerlens-client" });
-  res.json({ token, user: { id: user.userId, email: user.email, demo: true } });
+  setSessionCookie(res, token);
+  res.json({ user: { id: user.userId, email: user.email, demo: true } });
 });
 
+router.post("/logout", (req, res) => { clearSessionCookie(res); res.status(204).end(); });
 router.get("/me", authenticateToken, (req, res) => res.json({ id: req.user.userId, email: req.user.email, demo: Boolean(req.user.demo) }));
 
 export default router;

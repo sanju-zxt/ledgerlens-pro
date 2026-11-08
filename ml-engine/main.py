@@ -2,10 +2,12 @@
 from typing import List
 import hmac
 import os
+from datetime import datetime
 import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
+from sklearn.metrics import average_precision_score, confusion_matrix, roc_auc_score
 
 app = FastAPI(title="LedgerLens ML Engine", version="1.0.0")
 
@@ -22,16 +24,17 @@ def require_internal_api_key(authorization: str | None = Header(default=None)):
 
 
 class Transaction(BaseModel):
-    amount: float
-    description: str
+    amount: float = Field(allow_inf_nan=False)
+    description: str = Field(max_length=500)
     date: str
     category: str = "unknown"
     status: str = "COMPLETED"
+    currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
 
 
 class ForecastRequest(BaseModel):
     current_balance: float = Field(allow_inf_nan=False)
-    payment_amount: float = Field(default=3500.0, ge=0, allow_inf_nan=False)
+    payment_amount: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     payment_day_start: int = Field(default=7, ge=1, le=90)
     payment_day_end: int = Field(default=13, ge=1, le=90)
     daily_expense_mean: float = Field(default=78.0, ge=0, allow_inf_nan=False)
@@ -46,7 +49,7 @@ class ForecastRequest(BaseModel):
 
 
 class AnomalyRequest(BaseModel):
-    transactions: List[Transaction]
+    transactions: List[Transaction] = Field(max_length=1000)
     sensitivity: float = Field(default=0.1, gt=0, le=0.5)
 
 
@@ -120,14 +123,54 @@ async def forecast(request: ForecastRequest):
 
 @app.post("/anomaly", dependencies=[Depends(require_internal_api_key)])
 async def detect_anomaly(request: AnomalyRequest):
-    eligible = [(i, tx) for i, tx in enumerate(request.transactions) if tx.status.upper() in {"COMPLETED", "S", "REFUNDED", "REVERSED"}]
-    if len(eligible) < 3:
-        return {"anomalies": [], "message": "Need at least 3 eligible transactions", "total_checked": len(eligible), "interpretation": "Statistical outliers are not confirmed fraud."}
-    amounts = np.array([tx.amount for _, tx in eligible], dtype=float).reshape(-1, 1)
-    model = IsolationForest(contamination=request.sensitivity, random_state=42)
-    predictions = model.fit_predict(amounts)
-    scores = model.score_samples(amounts)
-    return {"anomalies": [{"index": index, "transaction": tx.model_dump(), "score": float(scores[j])} for j, ((index, tx), pred) in enumerate(zip(eligible, predictions)) if pred == -1], "total_checked": len(eligible), "interpretation": "Statistical outliers are not confirmed fraud."}
+    eligible = [(i, tx) for i, tx in enumerate(request.transactions) if tx.status.upper() in {"COMPLETED", "S"}]
+    by_currency = {}
+    for index, tx in eligible:
+        currency = tx.currency.upper()
+        by_currency.setdefault(currency, []).append((index, tx))
+    anomalies = []
+    skipped = {}
+    for currency, group in by_currency.items():
+        if len(group) < 3:
+            skipped[currency] = len(group)
+            continue
+        peer_counts = {}
+        for _, tx in group:
+            peer = (tx.category.strip().casefold(), tx.description.strip().casefold())
+            peer_counts[peer] = peer_counts.get(peer, 0) + 1
+        features = []
+        time_values = []
+        for _, tx in group:
+            peer = (tx.category.strip().casefold(), tx.description.strip().casefold())
+            try:
+                timestamp = datetime.fromisoformat(tx.date.replace("Z", "+00:00"))
+                week_hour = timestamp.weekday() * 24 + timestamp.hour + timestamp.minute / 60
+                angle = 2 * np.pi * week_hour / 168
+                time_features = [np.sin(angle), np.cos(angle), 1.0]
+                time_values.append(week_hour)
+            except ValueError:
+                time_features = [0.0, 0.0, 0.0]
+                time_values.append(None)
+            features.append([np.log1p(abs(tx.amount)), float(np.sign(tx.amount)), np.log1p(peer_counts[peer]), *time_features])
+        model = IsolationForest(contamination=request.sensitivity, random_state=42)
+        predictions = model.fit_predict(np.asarray(features, dtype=float))
+        scores = model.score_samples(np.asarray(features, dtype=float))
+        magnitudes = np.array([abs(tx.amount) for _, tx in group], dtype=float)
+        median = float(np.median(magnitudes))
+        mad = float(np.median(np.abs(magnitudes - median)))
+        scale = 1.4826 * mad
+        for position, ((index, tx), prediction) in enumerate(zip(group, predictions)):
+            if prediction != -1:
+                continue
+            relative_deviation = abs(abs(tx.amount) - median) / scale if scale else None
+            reason = "Transaction amount differs materially from the within-currency batch." if relative_deviation is not None and relative_deviation >= 3 else "Combined amount, transaction-time, and peer-frequency features differ from this within-currency batch."
+            anomalies.append({
+                "index": index, "transaction": tx.model_dump(), "score": float(scores[position]),
+                "reason": reason,
+                "features": {"currency_batch_median_abs_amount": median, "description_category_batch_frequency": peer_counts[(tx.category.strip().casefold(), tx.description.strip().casefold())], "time_feature_available": time_values[position] is not None}
+            })
+    message = "At least 3 completed transactions per currency are required for analysis." if skipped and not anomalies else None
+    return {"anomalies": anomalies, "message": message, "total_checked": len(eligible), "skipped_currency_groups": skipped, "feature_set": ["log absolute amount", "direction", "description/category frequency", "time of week", "currency-isolated model"], "interpretation": "Statistical outliers are review prompts, not confirmed fraud. Batch-relative signals are not merchant history."}
 
 
 @app.post("/calibration", dependencies=[Depends(require_internal_api_key)])
@@ -153,7 +196,30 @@ async def calibration(request: CalibrationRequest):
     brier = float(np.mean((p - y) ** 2))
     prevalence = float(y.mean())
     baseline_brier = float(np.mean((prevalence - y) ** 2))
-    return {"brier_score": brier, "baseline_brier_score": baseline_brier, "brier_skill_score": 1 - brier / baseline_brier if baseline_brier > 0 else None, "ece": float(ece), "expected_calibration_error": float(ece), "ece_method": "equal-width bins", "positive_rate": prevalence, "positive_count": int(y.sum()), "bins": request.bins, "n_samples": len(p), "reliability_bins": bins}
+    positive_count = int(y.sum())
+    negative_count = int(len(y) - positive_count)
+    threshold = 0.5
+    tn, fp, fn, tp = (int(value) for value in confusion_matrix(y, p >= threshold, labels=[0, 1]).ravel())
+    precision = tp / (tp + fp) if tp + fp else None
+    recall = tp / (tp + fn) if tp + fn else None
+    f1 = (2 * precision * recall / (precision + recall)) if precision is not None and recall is not None and precision + recall else (0.0 if positive_count else None)
+    roc_auc = float(roc_auc_score(y, p)) if positive_count and negative_count else None
+    pr_auc = float(average_precision_score(y, p)) if positive_count else None
+    return {
+        "brier_score": brier, "baseline_brier_score": baseline_brier,
+        "brier_skill_score": 1 - brier / baseline_brier if baseline_brier > 0 else None,
+        "ece": float(ece), "expected_calibration_error": float(ece), "ece_method": "equal-width bins",
+        "positive_rate": prevalence, "positive_count": positive_count, "negative_count": negative_count,
+        "class_distribution_valid": bool(positive_count and negative_count), "classification_threshold": threshold,
+        "evaluation_status": "two_class" if positive_count and negative_count else "single_class",
+        "class_distribution_warning": ("Positive-event performance cannot be validated because the evaluation dataset contains no positive labels." if not positive_count else "Negative-event performance cannot be validated because the evaluation dataset contains no negative labels." if not negative_count else None),
+        "confusion_matrix": {"true_positive": tp, "false_positive": fp, "true_negative": tn, "false_negative": fn},
+        "precision": precision, "recall": recall, "f1_score": f1,
+        "roc_auc": roc_auc, "pr_auc": pr_auc, "pr_auc_method": "average precision",
+        "holdout_validation": {"status": "unavailable", "reason": "This request has no temporal or group key for an independent split."},
+        "bins": request.bins, "n_samples": len(p), "reliability_bins": bins,
+        "limitation": "Single-class evaluation cannot validate positive-event performance; independent holdout evaluation requires genuine timestamped outcomes."
+    }
 
 
 if __name__ == "__main__":

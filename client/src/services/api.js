@@ -1,24 +1,27 @@
-const API_BASE = import.meta.env.VITE_API_URL || "/api"
+const API_BASE = import.meta.env.PROD ? "/api" : import.meta.env.VITE_API_URL || "/api"
+const normalizedBase = API_BASE.replace(/\/+$/, "")
+
+export function apiUrl(endpoint) {
+  return `${normalizedBase}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`
+}
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.name = "ApiError"; this.status = status }
 }
 
 class ApiClient {
-  constructor() { this.token = typeof localStorage === "undefined" ? null : localStorage.getItem("token") }
-  setToken(token) { this.token = token; localStorage.setItem("token", token) }
-  clearToken() { this.token = null; localStorage.removeItem("token") }
+  clearLegacyToken() { if (typeof localStorage !== "undefined") localStorage.removeItem("token") }
 
   async request(endpoint, options = {}) {
     const headers = { "Content-Type": "application/json", ...options.headers }
-    if (this.token) headers.Authorization = `Bearer ${this.token}`
     let response
-    try { response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers }) }
+    try { response = await fetch(apiUrl(endpoint), { ...options, headers, credentials: "include" }) }
     catch { throw new ApiError("Unable to reach LedgerLens API", 0) }
     if (!response.ok) {
       const error = await response.json().catch(() => ({}))
       throw new ApiError(error.message || "Request failed", response.status)
     }
+    if (response.status === 204) return null
     return response.json()
   }
   get(endpoint) { return this.request(endpoint, { method: "GET" }) }

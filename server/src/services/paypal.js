@@ -2,24 +2,86 @@ import axios from "axios";
 
 const paypalBase = () => process.env.PAYPAL_ENV === "production" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 let tokenCache;
+let tokenRequest;
+const retryableNetworkCodes = new Set(["ECONNABORTED", "ETIMEDOUT", "ECONNRESET", "EAI_AGAIN", "ENOTFOUND"]);
+
+function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+function retryDelay(error, attempt) {
+  const retryAfter = error.response?.headers?.["retry-after"];
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(0, Math.min(2000, seconds * 1000));
+    const dateDelay = Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(dateDelay)) return Math.max(0, Math.min(2000, dateDelay));
+  }
+  return Math.min(1500, 200 * 2 ** attempt);
+}
+
+export async function withPayPalRetry(operation, { retries = 2, delay = wait } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await operation(); }
+    catch (error) {
+      const status = error.response?.status;
+      const retryable = status === 429 || status >= 500 || retryableNetworkCodes.has(error.code);
+      if (!retryable || attempt >= retries) throw error;
+      await delay(retryDelay(error, attempt));
+    }
+  }
+}
+
+function normalizedPayPalError(error) {
+  const status = error.response?.status;
+  const transient = status === 429 || status >= 500 || retryableNetworkCodes.has(error.code);
+  const responseStatus = transient ? 503 : 502;
+  const message = status === 401 || status === 403
+    ? "PayPal rejected the configured credentials or Reporting permissions."
+    : status === 429
+      ? "PayPal is rate limiting requests. Retry after a short wait."
+      : transient
+        ? "PayPal Reporting is temporarily unavailable. Retry later."
+        : `PayPal Reporting request failed${status ? ` (HTTP ${status})` : ""}.`;
+  return Object.assign(new Error(message), { status: responseStatus });
+}
 
 export function paypalConfigured() {
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
 
-async function getAccessToken() {
+async function requestAccessToken() {
   if (!paypalConfigured()) throw Object.assign(new Error("PayPal is not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET."), { status: 503 });
-  if (tokenCache && tokenCache.expiresAt > Date.now() + 60000) return tokenCache.value;
   const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString("base64");
-  const { data } = await axios.post(`${paypalBase()}/v1/oauth2/token`, "grant_type=client_credentials", { headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 });
-  tokenCache = { value: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+  let data;
+  try {
+    ({ data } = await withPayPalRetry(() => axios.post(`${paypalBase()}/v1/oauth2/token`, "grant_type=client_credentials", { headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 })));
+  } catch (error) { throw normalizedPayPalError(error); }
+  if (typeof data.access_token !== "string" || !Number.isFinite(Number(data.expires_in)) || Number(data.expires_in) <= 0) throw Object.assign(new Error("PayPal returned an invalid OAuth token response."), { status: 502 });
+  tokenCache = { value: data.access_token, clientId: process.env.PAYPAL_CLIENT_ID, environment: process.env.PAYPAL_ENV || "sandbox", expiresAt: Date.now() + Number(data.expires_in) * 1000 };
   return tokenCache.value;
 }
 
+async function getAccessToken() {
+  if (tokenCache && tokenCache.expiresAt > Date.now() + 60000 && tokenCache.clientId === process.env.PAYPAL_CLIENT_ID && tokenCache.environment === (process.env.PAYPAL_ENV || "sandbox")) return tokenCache.value;
+  if (!tokenRequest) tokenRequest = requestAccessToken();
+  try { return await tokenRequest; }
+  finally { tokenRequest = null; }
+}
+
 export async function paypalGet(path, params = {}) {
-  const token = await getAccessToken();
-  const { data } = await axios.get(`${paypalBase()}${path}`, { params, headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, timeout: 20000 });
-  return data;
+  for (let authRetry = 0; authRetry < 2; authRetry++) {
+    const token = await getAccessToken();
+    try {
+      const { data } = await withPayPalRetry(() => axios.get(`${paypalBase()}${path}`, { params, headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, timeout: 20000 }));
+      return data;
+    } catch (error) {
+      if (error.response?.status === 401 && authRetry === 0) {
+        if (tokenCache?.value === token) tokenCache = undefined;
+        continue;
+      }
+      throw normalizedPayPalError(error);
+    }
+  }
+  throw Object.assign(new Error("PayPal authorization could not be refreshed."), { status: 502 });
 }
 
 export async function getBalances(asOfTime) {

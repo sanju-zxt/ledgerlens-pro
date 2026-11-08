@@ -23,4 +23,25 @@ test("checked-in calibration metrics are computed from source rows", () => {
   assert.equal(result.source, "evidence/calibration_data.csv");
   assert.ok(result.brier_score >= 0 && result.brier_score <= 1);
   assert.ok(result.expected_calibration_error >= 0 && result.expected_calibration_error <= 1);
+  assert.equal(result.positive_count, 0);
+  assert.equal(result.class_distribution_valid, false);
+  assert.equal(result.roc_auc, null);
+  assert.equal(result.pr_auc, null);
+  assert.equal(result.recall, null);
+  assert.equal(result.brier_score > result.baseline_brier_score, true);
+});
+
+test("event metrics are defined on a two-class evaluation sample", () => {
+  // Synthetic unit inputs verify metric math only; they are not product evidence.
+  const result = calculateCalibration([
+    { prediction: 0.9, label: 1 }, { prediction: 0.8, label: 0 },
+    { prediction: 0.2, label: 1 }, { prediction: 0.1, label: 0 }
+  ]);
+  assert.deepEqual(result.confusion_matrix, { true_positive: 1, false_positive: 1, true_negative: 1, false_negative: 1 });
+  assert.equal(result.precision, 0.5);
+  assert.equal(result.recall, 0.5);
+  assert.equal(result.f1_score, 0.5);
+  assert.equal(result.roc_auc, 0.75);
+  assert.ok(Math.abs(result.pr_auc - 5 / 6) < 1e-12);
+  assert.equal(result.holdout_validation.status, "unavailable");
 });

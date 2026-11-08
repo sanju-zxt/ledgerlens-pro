@@ -22,6 +22,9 @@ class ServiceAuthTests(unittest.TestCase):
 
 
 class ForecastTests(unittest.TestCase):
+    def test_forecast_does_not_assume_unverified_future_income(self):
+        self.assertEqual(ForecastRequest(current_balance=1000).payment_amount, 0.0)
+
     def test_reproducible_seeded_forecast(self):
         request = ForecastRequest(current_balance=3500, payment_amount=1000, daily_expense_mean=80, daily_expense_std=15, simulations=1000, seed=42)
         self.assertEqual(asyncio.run(forecast(request)), asyncio.run(forecast(request)))
@@ -53,6 +56,25 @@ class CalibrationTests(unittest.TestCase):
         self.assertAlmostEqual(result["brier_skill_score"], 0.96)
         self.assertEqual(len(result["reliability_bins"]), 10)
 
+    def test_single_class_metrics_are_explicitly_unavailable(self):
+        result = asyncio.run(calibration(CalibrationRequest(predictions=[0.9, 0.1], labels=[0, 0])))
+        self.assertFalse(result["class_distribution_valid"])
+        self.assertIsNone(result["roc_auc"])
+        self.assertIsNone(result["pr_auc"])
+        self.assertIsNone(result["recall"])
+        self.assertEqual(result["holdout_validation"]["status"], "unavailable")
+        self.assertGreater(result["brier_score"], result["baseline_brier_score"])
+
+    def test_synthetic_unit_sample_exercises_binary_event_metrics(self):
+        # Synthetic inputs exercise metric math only; they are not training or product evidence.
+        result = asyncio.run(calibration(CalibrationRequest(predictions=[0.9, 0.8, 0.2, 0.1], labels=[1, 0, 1, 0])))
+        self.assertEqual(result["confusion_matrix"], {"true_positive": 1, "false_positive": 1, "true_negative": 1, "false_negative": 1})
+        self.assertEqual(result["precision"], 0.5)
+        self.assertEqual(result["recall"], 0.5)
+        self.assertEqual(result["f1_score"], 0.5)
+        self.assertEqual(result["roc_auc"], 0.75)
+        self.assertAlmostEqual(result["pr_auc"], 5 / 6)
+
 
 class AnomalyTests(unittest.TestCase):
     def test_detector_returns_review_signals_not_fraud_labels(self):
@@ -61,6 +83,22 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(result["total_checked"], 5)
         self.assertTrue(result["anomalies"])
         self.assertIn("not confirmed fraud", result["interpretation"])
+
+    def test_completed_activity_is_analyzed_per_currency_and_refunds_are_excluded(self):
+        transactions = [
+            Transaction(amount=value, description=f"merchant-{index}", date="2026-01-01T10:00:00Z", currency="EUR")
+            for index, value in enumerate([10, 11, 1000])
+        ]
+        transactions.extend([
+            Transaction(amount=20, description="small-usd-a", date="2026-01-01", currency="USD"),
+            Transaction(amount=30, description="small-usd-b", date="2026-01-01", currency="USD"),
+            Transaction(amount=5000, description="refund", date="2026-01-01", currency="USD", status="REFUNDED")
+        ])
+        result = asyncio.run(detect_anomaly(AnomalyRequest(transactions=transactions)))
+        self.assertEqual(result["total_checked"], 5)
+        self.assertEqual(result["skipped_currency_groups"], {"USD": 2})
+        self.assertIn("time of week", result["feature_set"])
+        self.assertTrue(all(item["transaction"]["currency"] == "EUR" for item in result["anomalies"]))
 
 
 if __name__ == "__main__":

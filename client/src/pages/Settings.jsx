@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
-import { api } from "../services/api"
+import { api, apiUrl } from "../services/api"
 
 const evidenceFiles = [
-  ["/api/evidence/balance_logs.csv", "Balance ledger CSV"],
-  ["/api/evidence/backtest.csv", "Backtest windows CSV"],
-  ["/api/evidence/calibration_data.csv", "Calibration data CSV"],
-  ["/api/evidence/paypal-balance", "PayPal balance fixture"],
-  ["/api/evidence/manifest", "SHA-256 manifest"]
+  ["/evidence/balance_logs.csv", "Balance ledger CSV"],
+  ["/evidence/backtest.csv", "Backtest windows CSV"],
+  ["/evidence/calibration_data.csv", "Calibration data CSV"],
+  ["/evidence/paypal-balance", "PayPal balance fixture"],
+  ["/evidence/manifest", "SHA-256 manifest"]
 ]
 
 export default function Settings() {
@@ -22,6 +22,6 @@ export default function Settings() {
       {balance.error && <p role="alert" className="mt-3 text-sm text-red-700">{balance.error.message}</p>}
       {balance.data && <div className="mt-4 rounded-lg bg-slate-50 p-4 text-sm"><p>Retrieved: {new Date(balance.data.provenance.retrieved_at).toLocaleString()}</p><p className="mt-1">{balance.data.provenance.freshness_note}</p>{balance.data.balances?.map((item, index) => <p key={index} className="mt-2">{item.currency}: available {item.available_balance?.value}, withheld {item.withheld_balance?.value}, total {item.total_balance?.value}</p>)}</div>}
     </div>
-    <div className="card"><h2 className="text-lg font-semibold">Evidence package</h2><p className="mt-2 text-sm text-slate-600">Read-only source files and their generated manifest. Evidence stays separate from model output.</p><div className="mt-4 flex flex-wrap gap-3">{evidenceFiles.map(([href, label]) => <a key={href} className="btn-secondary" href={href} target="_blank" rel="noreferrer">{label}</a>)}</div><p className="mt-3 text-xs text-amber-800">The backtest references raw source CSVs that are not present in this repository. Its outcomes cannot be independently reproduced from the checked-in files.</p></div>
+    <div className="card"><h2 className="text-lg font-semibold">Evidence package</h2><p className="mt-2 text-sm text-slate-600">Read-only source files and their generated manifest. Evidence stays separate from model output.</p><div className="mt-4 flex flex-wrap gap-3">{evidenceFiles.map(([href, label]) => <a key={href} className="btn-secondary" href={apiUrl(href)} target="_blank" rel="noreferrer">{label}</a>)}</div><p className="mt-3 text-xs text-amber-800">The backtest references raw source CSVs that are not present in this repository. Its outcomes cannot be independently reproduced from the checked-in files.</p></div>
   </section>
 }

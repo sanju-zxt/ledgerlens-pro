@@ -5,20 +5,51 @@ import Decimal from "decimal.js";
 
 const evidencePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../evidence/balance_logs.csv");
 
+export function parseCsvRecords(contents) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < contents.length; index++) {
+    const char = contents[index];
+    if (quoted) {
+      if (char === '"' && contents[index + 1] === '"') { field += '"'; index++; }
+      else if (char === '"') quoted = false;
+      else field += char;
+    } else if (char === '"') {
+      if (field.length) throw new Error("Invalid CSV: quote must start a field");
+      quoted = true;
+    } else if (char === ",") { row.push(field); field = ""; }
+    else if (char === "\n" || char === "\r") {
+      if (char === "\r" && contents[index + 1] === "\n") index++;
+      row.push(field); field = "";
+      if (row.some(value => value !== "")) rows.push(row);
+      row = [];
+    } else field += char;
+  }
+  if (quoted) throw new Error("Invalid CSV: unterminated quoted field");
+  row.push(field);
+  if (row.some(value => value !== "")) rows.push(row);
+  return rows;
+}
+
 export function readLedgerEvidence() {
-  const [header, ...lines] = fs.readFileSync(evidencePath, "utf8").replace(/^\uFEFF/, "").trim().split(/\r?\n/);
-  const columns = header.split(",");
-  const events = lines.map(line => {
-    const values = line.split(",");
-    return Object.fromEntries(columns.map((column, index) => [column, values[index] ?? ""]));
+  const [columns, ...records] = parseCsvRecords(fs.readFileSync(evidencePath, "utf8").replace(/^\uFEFF/, ""));
+  if (!columns || new Set(columns).size !== columns.length || columns.join(",") !== "seq,timestamp_utc,event_type,amount,direction,balance,source,txn_id") throw new Error("Sandbox ledger has an invalid or unexpected CSV header");
+  const events = records.map((values, index) => {
+    if (values.length !== columns.length) throw new Error(`Invalid ledger CSV column count at row ${index + 2}`);
+    return Object.fromEntries(columns.map((column, columnIndex) => [column, values[columnIndex]]));
   });
   if (events.length < 2 || events[0].event_type !== "SNAPSHOT" || events[0].direction !== "OPENING") throw new Error("Sandbox ledger is missing its opening snapshot");
+  if (events.some((event, index) => Number(event.seq) !== index + 1 || !Number.isFinite(Date.parse(event.timestamp_utc)))) throw new Error("Sandbox ledger sequence or timestamp is invalid");
+  const transactionIds = events.filter(event => event.event_type === "MOVEMENT").map(event => event.txn_id);
+  if (new Set(transactionIds).size !== transactionIds.length) throw new Error("Sandbox ledger contains duplicate transaction IDs");
   let balance = new Decimal(events[0].balance);
   const transactions = [];
   for (const event of events.slice(1)) {
     if (event.event_type === "MOVEMENT") {
       const amount = new Decimal(event.amount);
-      if (!event.txn_id || !["CREDIT", "DEBIT"].includes(event.direction)) throw new Error(`Invalid ledger movement at sequence ${event.seq}`);
+      if (amount.isNegative() || !event.txn_id || !["CREDIT", "DEBIT"].includes(event.direction)) throw new Error(`Invalid ledger movement at sequence ${event.seq}`);
       balance = event.direction === "CREDIT" ? balance.plus(amount) : balance.minus(amount);
       if (!balance.equals(event.balance)) throw new Error(`Ledger balance mismatch at sequence ${event.seq}`);
       transactions.push({ id: event.txn_id, date: event.timestamp_utc, description: event.direction === "CREDIT" ? "Evidence ledger credit" : "Evidence ledger debit", amount: amount.toFixed(2), currency: "USD", type: event.direction, status: "COMPLETED", source: "SANDBOX_EVIDENCE", provenance: `evidence/balance_logs.csv row ${event.seq}` });

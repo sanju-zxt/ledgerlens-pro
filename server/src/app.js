@@ -12,7 +12,7 @@ import { authenticateToken } from "./middleware/auth.js"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { readLedgerEvidence } from "./services/ledger.js"
-import { errorHandler } from "./middleware/auth.js"
+import { enforceBrowserOrigin, errorHandler } from "./middleware/auth.js"
 import { randomBytes } from "node:crypto"
 import { getBalances, normalizePayPalBalances } from "./services/paypal.js"
 
@@ -24,9 +24,11 @@ if (process.env.NODE_ENV === "production" && (!process.env.JWT_SECRET || process
 
 const app = express()
 app.disable("x-powered-by")
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1)
 app.use(helmet())
 const allowedOrigins = new Set((process.env.CLIENT_ORIGIN || "http://localhost:3000").split(",").map(origin => origin.trim()).filter(Boolean))
-app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)) }))
+app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)), credentials: true }))
+app.use(enforceBrowserOrigin(allowedOrigins))
 app.use(express.json({ limit: "100kb" }))
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }))

@@ -10,7 +10,7 @@ If Sandbox Reporting is working, use the configured workspace and show the PayPa
 
 ## 0:20–0:55 — Financial overview
 
-Show closing balance, median 30-day balance, reserve runway, and reserve dip probability. Say: “The ledger balance is reconciled historical evidence. The forecast is a model, not guaranteed income.” Point to the $3,500 illustrative inflow assumption and uncertainty band.
+Show the balance source and currency, median 30-day balance, reserve runway, and reserve-dip probability. Say: “The starting balance comes from the labeled evidence fixture or the PayPal balance endpoint. The forecast is a model, not guaranteed income.” Point out that baseline future income is zero and show the uncertainty band.
 
 ## 0:55–1:25 — Trace the ledger
 
@@ -18,7 +18,7 @@ Open Transactions. Show the source labels and the small fixture ledger. Explain 
 
 ## 1:25–2:00 — Simulate a decision
 
-Return to Overview, move the income-delay or emergency-expense control, and run the scenario. Explain that this changes model assumptions only; it does not schedule, send, or move a payment.
+Open Forecast, enter an explicitly hypothetical receipt if desired, adjust delay or emergency-expense inputs, and run the scenario. Explain that this changes model assumptions only; it does not schedule, send, or move a payment.
 
 ## 2:00–2:25 — Review intelligence
 

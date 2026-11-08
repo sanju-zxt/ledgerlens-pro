@@ -12,7 +12,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_ORIGIN
-        value: http://localhost:3000
+        value: https://ledgerlens-pro.vercel.app
       - key: DEMO_MODE_ENABLED
         value: "true"
       - key: PAYPAL_ENV

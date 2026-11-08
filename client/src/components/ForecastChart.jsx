@@ -7,12 +7,12 @@ export function ForecastChart({ data }) {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="date" tick={{ fill: "#64748b", fontSize: 12 }} />
+          <XAxis dataKey="day" tick={{ fill: "#64748b", fontSize: 12 }} tickFormatter={day => `Day ${day}`} />
           <YAxis tick={{ fill: "#64748b", fontSize: 12 }} tickFormatter={val => `$${val}`} />
-          <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, "Balance"]} labelFormatter={(date) => new Date(date).toLocaleDateString()} />
-          <Line type="monotone" dataKey="balance" stroke="#0ea5e9" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-          <Line type="monotone" dataKey="lower_bound" stroke="#fef08a" strokeWidth={1} strokeDasharray="5 5" dot={false} />
-          <Line type="monotone" dataKey="upper_bound" stroke="#fef08a" strokeWidth={1} strokeDasharray="5 5" dot={false} />
+          <Tooltip formatter={(value) => [`$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`]} labelFormatter={day => `Day ${day}`} />
+          <Line name="Median" type="monotone" dataKey="median" stroke="#0ea5e9" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+          <Line name="P15 lower" type="monotone" dataKey="lower_bound" stroke="#94a3b8" strokeWidth={1} strokeDasharray="5 5" dot={false} />
+          <Line name="P85 upper" type="monotone" dataKey="upper_bound" stroke="#94a3b8" strokeWidth={1} strokeDasharray="5 5" dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

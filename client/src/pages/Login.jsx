@@ -37,7 +37,7 @@ export default function Login() {
           <button type="submit" className="btn-primary w-full mt-4">Sign In</button>
         </form>
         <p className="mt-4 text-center text-sm text-slate-500">
-          Demo: demo@ledgerlens.com / password123
+          Access is managed by your workspace administrator. Demo credentials are never embedded in the app.
         </p>
       </div>
     </div>

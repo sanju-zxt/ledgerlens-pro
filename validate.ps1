@@ -5,6 +5,16 @@ $git = (git rev-parse HEAD).Trim()
 if ($git -notmatch "^[0-9a-f]{40}$") { throw "Invalid Git commit format" }
 if ($git -ne $manifest.git) { throw "Git commit mismatch" }
 
+$requiredEvidence = @(
+    "evidence/balance_logs.csv",
+    "evidence/backtest.csv",
+    "evidence/calibration_data.csv",
+    "evidence/paypal_api_responses/balance_response.json"
+)
+foreach ($name in $requiredEvidence) {
+    if (!$manifest.files.PSObject.Properties[$name]) { throw "Required evidence missing from manifest: $name" }
+}
+
 foreach ($prop in $manifest.files.PSObject.Properties) {
     $name = $prop.Name
     $expected = $prop.Value.sha256.ToLower()
@@ -13,7 +23,11 @@ foreach ($prop in $manifest.files.PSObject.Properties) {
     if ($expected -notmatch "^[0-9a-f]{64}$") { throw "Invalid SHA-256 format: $name" }
     if (!(Test-Path $name -PathType Leaf)) { throw "Missing file: $name" }
 
-    $actual = (Get-FileHash $name -Algorithm SHA256).Hash.ToLower()
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = $sha.ComputeHash([System.IO.File]::ReadAllBytes((Resolve-Path $name)))
+        $actual = ([System.BitConverter]::ToString($digest) -replace "-", "").ToLower()
+    } finally { $sha.Dispose() }
     $actualSize = (Get-Item $name).Length
 
     if ($actual -ne $expected) { throw "Hash mismatch: $name" }
@@ -23,3 +37,5 @@ foreach ($prop in $manifest.files.PSObject.Properties) {
 }
 
 Write-Host "`nALL MANIFEST CHECKS PASSED"
+python verify_evidence.py
+if ($LASTEXITCODE -ne 0) { throw "Evidence semantic checks failed" }

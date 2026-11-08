@@ -1,29 +1,31 @@
-﻿import express from "express"
-const router = express.Router()
+import express from "express";
+import { forecastCashflow } from "../services/forecast.js";
+import { authenticateToken } from "../middleware/auth.js";
+import { readLedgerEvidence } from "../services/ledger.js";
 
-router.get("/", (req, res) => {
-  res.json({
-    day_30_balance: 2650.00,
-    runway_days: 34,
-    risk_score: 23,
-    trend: { value: 2.1, direction: "up", period: "vs last week" },
-    chart_data: Array.from({ length: 30 }, (_, i) => ({
-      date: new Date(Date.now() + i * 86400000).toISOString().split("T")[0],
-      balance: 7000 - i * 200 + Math.random() * 200 - 100,
-      lower_bound: 6000 - i * 200,
-      upper_bound: 8000 - i * 200
-    })
-  })
-})
+const router = express.Router();
+router.use(authenticateToken);
 
-router.post("/simulate", (req, res) => {
-  const { delay_days = 0, emergency_amount = 0, cost_reduction = 0 } = req.body
-  const base = 2650 - delay_days * 150 - emergency_amount + cost_reduction
-  res.json({
-    day_30_balance: Math.max(0, base),
-    runway_days: Math.max(0, 34 - delay_days),
-    scenario_applied: { delay_days, emergency_amount, cost_reduction }
-  })
-})
+router.get("/", (req, res, next) => {
+  try {
+    const ledger = readLedgerEvidence();
+    const startingBalance = ledger.closingBalance.toNumber();
+    const result = forecastCashflow({ currentBalance: startingBalance, paymentAmount: 3500 });
+    res.json({ ...result, trend: null, source_balance: { amount: startingBalance, currency: ledger.currency, source: "SANDBOX_EVIDENCE", as_of: ledger.asOf } });
+  } catch (error) { next(error); }
+});
 
-export default router
+router.post("/simulate", (req, res, next) => {
+  try {
+    const { delay_days = 0, emergency_amount = 0, cost_reduction = 0 } = req.body || {};
+    for (const [key, value, max] of [["delay_days", delay_days, 90], ["emergency_amount", emergency_amount, 100000], ["cost_reduction", cost_reduction, 100000]]) {
+      if (!Number.isFinite(value) || value < 0 || value > max) return res.status(400).json({ message: `${key} must be between 0 and ${max}` });
+    }
+    const ledger = readLedgerEvidence();
+    const startingBalance = ledger.closingBalance.toNumber();
+    const result = forecastCashflow({ currentBalance: startingBalance, paymentAmount: 3500, paymentDays: [7 + delay_days, 13 + delay_days], emergencyProbability: emergency_amount > 0 ? 1 : 0.05, dailyExpenseMean: Math.max(0, 78 - cost_reduction / 30), emergencyAmount: emergency_amount > 0 ? [emergency_amount, emergency_amount] : [200, 500] });
+    res.json({ ...result, scenario_applied: { delay_days, emergency_amount, cost_reduction }, source_balance: { amount: startingBalance, currency: ledger.currency, source: "SANDBOX_EVIDENCE", as_of: ledger.asOf } });
+  } catch (error) { next(error); }
+});
+
+export default router;

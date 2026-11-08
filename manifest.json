@@ -1,0 +1,22 @@
+{
+  "git": "34079bb388aece990eaa9d5d4a9618ba8812617b",
+  "generated_at": "2026-11-08T10:51:31.110Z",
+  "files": {
+    "evidence/balance_logs.csv": {
+      "sha256": "99e91aaa8a9a37fb5843164e8847abb817662b7b0c7be102ac85a9572ba215cd",
+      "size": 358
+    },
+    "evidence/backtest.csv": {
+      "sha256": "c1a8cf1d7fb27f1657321538f55af2442f8d7f45d2c5e06f342104314f7bba29",
+      "size": 1121
+    },
+    "evidence/calibration_data.csv": {
+      "sha256": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+      "size": 13704
+    },
+    "evidence/paypal_api_responses/balance_response.json": {
+      "sha256": "05345eb698784c850a3d45f528f7bf74fe9e54b3cc844bb50b78c8d0505ebdff",
+      "size": 420
+    }
+  }
+}

@@ -1,3 +1,10 @@
-﻿export default function Transactions() {
-  return <div className="card"><h2 className="text-xl font-bold mb-4">Transactions</h2><p className="text-slate-500">Coming soon...</p></div>
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { api } from "../services/api"
+
+export default function Transactions() {
+  const [page, setPage] = useState(0)
+  const { data, isLoading, error } = useQuery({ queryKey: ["transactions", "evidence", page], queryFn: () => api.get(`/transactions?limit=50&page=${page + 1}`) })
+  return <section className="space-y-5"><header><p className="text-sm font-semibold uppercase tracking-wider text-primary-600">Ledger</p><h1 className="mt-1 text-3xl font-bold">Transactions</h1><p className="mt-2 text-slate-500">Imported financial events with source and retrieval context.</p></header>
+    <div className="card overflow-x-auto">{isLoading ? <p>Loading ledger…</p> : error ? <p role="alert" className="text-red-700">{error.message}</p> : <><div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sandbox evidence from the checked-in ledger. This is not a live PayPal feed.</div><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="p-3">Date</th><th className="p-3">Event</th><th className="p-3">Status</th><th className="p-3">Currency</th><th className="p-3 text-right">Amount</th><th className="p-3">Source</th></tr></thead><tbody>{(data?.data || []).map(tx => <tr key={tx.id} className="border-b last:border-0"><td className="p-3">{new Date(tx.date).toLocaleString()}</td><td className="p-3">{tx.description}<div className="text-xs text-slate-500">{tx.id}</div></td><td className="p-3">{tx.status}</td><td className="p-3">{tx.currency}</td><td className="p-3 text-right font-mono">{tx.type === "DEBIT" ? "−" : "+"}{Number(tx.amount).toFixed(2)}</td><td className="p-3 text-xs">{tx.source}</td></tr>)}</tbody></table><div className="mt-4 flex items-center justify-between text-sm text-slate-500"><span>{data?.total ?? 0} events · {data?.source}</span><div className="flex gap-2"><button className="btn-secondary" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button><button className="btn-secondary" disabled={(page + 1) * 50 >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)}>Next</button></div></div></>}</div></section>
 }

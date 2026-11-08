@@ -1,6 +1,7 @@
 ﻿import { createContext, useContext, useState, useEffect } from "react"
 
 const AuthContext = createContext(null)
+import { api } from "../services/api"
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -25,11 +26,11 @@ export function AuthProvider({ children }) {
     })
     if (!res.ok) throw new Error("Login failed")
     const { token, user } = await res.json()
-    localStorage.setItem("token", token)
+    api.setToken(token)
     setUser(user)
   }
 
-  const logout = () => { localStorage.removeItem("token"); setUser(null) }
+  const logout = () => { api.clearToken(); setUser(null) }
 
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>

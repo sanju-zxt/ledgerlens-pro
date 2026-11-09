@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../hooks/useAuth"
+import { api } from "../services/api"
 
 function BrandMark() {
   return <span className="brand-mark" aria-hidden="true"><span /><span /><span /></span>
@@ -9,12 +10,21 @@ function BrandMark() {
 export default function Login() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [workspaceName, setWorkspaceName] = useState("")
+  const [registerMode, setRegisterMode] = useState(false)
+  const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
   const { login, demoLogin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const nextPath = location.state?.from || "/"
+
+  useEffect(() => {
+    const token = new URLSearchParams(location.search).get("token")
+    if (!token) return
+    api.get(`/auth/verify-email?token=${encodeURIComponent(token)}`).then(result => setNotice(result.message)).catch(err => setError(err.message))
+  }, [location.search])
 
   const enterDemo = async () => {
     setPending(true)
@@ -28,7 +38,12 @@ export default function Login() {
     event.preventDefault()
     setPending(true)
     setError("")
-    try { await login(email, password); navigate(nextPath, { replace: true }) }
+    try {
+      if (registerMode) {
+        const result = await api.post("/auth/register", { email, password, workspace_name: workspaceName })
+        setNotice(result.verification_url ? `Workspace created. Verify your email using this link: ${result.verification_url}` : result.message)
+      } else { await login(email, password); navigate(nextPath, { replace: true }) }
+    }
     catch (err) { setError(err.message) }
     finally { setPending(false) }
   }
@@ -47,13 +62,16 @@ export default function Login() {
       <div className="mobile-brand"><div className="brand-lockup"><BrandMark /><span>LedgerLens <b>Pro</b></span></div></div>
       <p className="eyebrow">YOUR FINANCIAL WORKSPACE</p><h2 id="welcome-title">Welcome to a clearer view.</h2><p className="login-intro">Step into the interactive merchant demo or sign in to your workspace.</p>
       <button className="demo-entry" type="button" onClick={enterDemo} disabled={pending}><span className="demo-icon" aria-hidden="true">↗</span><span className="demo-copy"><strong>{pending ? "Opening your workspace…" : "Explore the sandbox demo"}</strong><small>One click · sample evidence · no PayPal credentials needed</small></span><span className="demo-arrow" aria-hidden="true">→</span></button>
-      <div className="login-divider"><span />OR SIGN IN<span /></div>
+      <div className="login-divider"><span />{registerMode ? "CREATE WORKSPACE" : "OR SIGN IN"}<span /></div>
       <form onSubmit={handleSubmit} className="login-form">
+        {registerMode && <><label htmlFor="workspace">Workspace name</label><input id="workspace" value={workspaceName} onChange={event => setWorkspaceName(event.target.value)} required maxLength={120} /></>}
         <label htmlFor="email">Work email</label><input id="email" autoComplete="username" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@company.com" required />
-        <div className="password-label"><label htmlFor="password">Password</label><span>Workspace access</span></div><input id="password" autoComplete="current-password" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" required />
+        <div className="password-label"><label htmlFor="password">Password</label><span>{registerMode ? "12 characters minimum" : "Workspace access"}</span></div><input id="password" autoComplete={registerMode ? "new-password" : "current-password"} minLength={registerMode ? 12 : undefined} type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" required />
         {error && <p className="login-error" role="alert">{error}</p>}
-        <button type="submit" className="sign-in-button" disabled={pending}>{pending ? "Signing in…" : "Sign in securely"}<span aria-hidden="true">→</span></button>
+        {notice && <p className="login-trust" role="status">{notice}</p>}
+        <button type="submit" className="sign-in-button" disabled={pending}>{pending ? (registerMode ? "Creating workspace…" : "Signing in…") : (registerMode ? "Create workspace" : "Sign in securely")}<span aria-hidden="true">→</span></button>
       </form>
+      <button type="button" className="mt-4 text-sm font-semibold text-primary-700" onClick={() => { setRegisterMode(value => !value); setError(""); setNotice("") }}>{registerMode ? "Already have a workspace? Sign in" : "Create a new workspace"}</button>
       <div className="login-trust"><span className="trust-check">✓</span><p>The demo contains only labeled sandbox evidence. It does not connect to or expose a merchant account.</p></div>
       <p className="login-bottom">Need a PayPal Sandbox connection? Configure server credentials in <code>.env</code> after entering the demo.</p>
     </div></section>

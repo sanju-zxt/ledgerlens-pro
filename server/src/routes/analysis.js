@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 
 const router = express.Router();
 router.use(authenticateToken);
+router.use((req, res, next) => req.user.demo || req.user.tenantId ? next() : res.status(409).json({ message: "Use a registered workspace and connect its PayPal merchant account first." }));
 
 function pipelineUrl(path) { return `${(process.env.ML_ENGINE_URL || "http://127.0.0.1:8001").replace(/\/$/, "")}/pipeline/${path}`; }
 function pipelineHeaders() { return process.env.ML_ENGINE_API_KEY ? { Authorization: `Bearer ${process.env.ML_ENGINE_API_KEY}` } : {}; }
@@ -30,7 +31,7 @@ router.get("/pipeline", async (req, res, next) => {
   try {
     const [store, txs] = await Promise.all([
       callPipeline(req, "labels"),
-      req.user.demo ? Promise.resolve(readLedgerEvidence().transactions) : listTransactions({})
+      req.user.demo ? Promise.resolve(readLedgerEvidence().transactions) : listTransactions({ tenantId: req.user.tenantId || null })
     ]);
     const reviewed = new Set(store.data.labels.map(label => label.transaction_id));
     const triaged = new Set((store.data.triage_queue || []).map(item => item.transaction_id));
@@ -44,7 +45,7 @@ router.post("/labels", async (req, res, next) => {
     const { transaction_key, label, rationale, source } = req.body || {};
     if (typeof transaction_key !== "string" || transaction_key.length > 500 || ![0, 1].includes(label) || typeof rationale !== "string" || rationale.trim().length < 12) return res.status(400).json({ message: "Select a transaction, an outcome, and provide a specific review rationale (at least 12 characters)." });
     if (source === "PAYPAL_TRANSACTION_SEARCH" && req.user.demo) return res.status(403).json({ message: "Demo accounts can label only checked-in sandbox evidence." });
-    const transactions = source === "SANDBOX_EVIDENCE" && req.user.demo ? readLedgerEvidence().transactions : source === "PAYPAL_TRANSACTION_SEARCH" && !req.user.demo ? await listTransactions({}) : null;
+    const transactions = source === "SANDBOX_EVIDENCE" && req.user.demo ? readLedgerEvidence().transactions : source === "PAYPAL_TRANSACTION_SEARCH" && !req.user.demo ? await listTransactions({ tenantId: req.user.tenantId || null }) : null;
     if (!transactions) return res.status(400).json({ message: "The submitted source is not available for this account." });
     const transaction = transactions.find(item => transactionKey(item) === transaction_key);
     if (!transaction) return res.status(404).json({ message: "That transaction was not returned by the selected verified source." });
@@ -60,7 +61,7 @@ router.post("/review-status", async (req, res, next) => {
     const { transaction_key, rationale, source } = req.body || {};
     if (typeof transaction_key !== "string" || transaction_key.length > 500 || typeof rationale !== "string" || rationale.trim().length < 12 || rationale.length > 2000) return res.status(400).json({ message: "Select a transaction and provide an evidence-based rationale (12–2000 characters)." });
     if (source === "PAYPAL_TRANSACTION_SEARCH" && req.user.demo) return res.status(403).json({ message: "Demo accounts can review only checked-in sandbox evidence." });
-    const transactions = source === "SANDBOX_EVIDENCE" && req.user.demo ? readLedgerEvidence().transactions : source === "PAYPAL_TRANSACTION_SEARCH" && !req.user.demo ? await listTransactions({}) : null;
+    const transactions = source === "SANDBOX_EVIDENCE" && req.user.demo ? readLedgerEvidence().transactions : source === "PAYPAL_TRANSACTION_SEARCH" && !req.user.demo ? await listTransactions({ tenantId: req.user.tenantId || null }) : null;
     if (!transactions) return res.status(400).json({ message: "The submitted source is not available for this account." });
     const transaction = transactions.find(item => transactionKey(item) === transaction_key);
     if (!transaction) return res.status(404).json({ message: "That transaction was not returned by the selected verified source." });
@@ -92,7 +93,7 @@ router.get("/recurring", async (req, res, next) => {
     const live = req.query.source === "paypal";
     if (live && req.user.demo) return res.status(403).json({ message: "Demo sessions can access only labeled sandbox evidence." });
     const evidence = req.query.source === "evidence";
-    const transactions = live ? await listTransactions({ startDate: req.query.start_date, endDate: req.query.end_date }) : evidence ? readLedgerEvidence().transactions : [];
+    const transactions = live ? await listTransactions({ startDate: req.query.start_date, endDate: req.query.end_date, tenantId: req.user.tenantId || null }) : evidence ? readLedgerEvidence().transactions : [];
     const candidates = detectRecurringObligations(transactions);
     res.json({ candidates, source: live ? "PAYPAL_TRANSACTION_SEARCH" : evidence ? "SANDBOX_EVIDENCE" : "NO_DATA", retrieved_at: live || evidence ? new Date().toISOString() : null, message: live || evidence ? (candidates.length ? undefined : evidence ? "No recurring pattern met the minimum evidence rules. This evidence fixture has too few matching events to infer a cadence." : "No recurring pattern met the minimum evidence rules.") : "Choose a transaction source to analyze history." });
   } catch (error) { next(error); }

@@ -27,6 +27,7 @@ function App() {
         <BrowserRouter>
           <Suspense fallback={<div className="min-h-screen grid place-items-center text-slate-500">Loading LedgerLens…</div>}><Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/verify-email" element={<Login />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/transactions" element={<Transactions />} />

@@ -19,6 +19,26 @@ services:
         sync: false
       - key: DEMO_PASSWORD_HASH
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: PAYPAL_PARTNER_APPROVED
+        value: "false"
+      - key: PAYPAL_PARTNER_MERCHANT_ID
+        sync: false
+      - key: PAYPAL_ATTRIBUTION_ID
+        sync: false
+      - key: PAYPAL_ONBOARDING_RETURN_URL
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
       - key: PAYPAL_ENV
         value: sandbox
       - key: PAYPAL_CLIENT_ID

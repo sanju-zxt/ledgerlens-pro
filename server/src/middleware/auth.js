@@ -1,21 +1,31 @@
-﻿import jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+import { databaseConfigured, query } from "../services/database.js";
 
-export function authenticateToken(req, res, next) {
+export async function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   const cookieHeader = req.headers.cookie || "";
   const sessionCookie = cookieHeader.split(";").map(part => part.trim()).find(part => part.startsWith("ledgerlens_session="));
   const cookieToken = sessionCookie ? sessionCookie.slice("ledgerlens_session=".length) : null;
   const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1];
   const token = cookieToken || bearer;
-
   if (!token) return res.status(401).json({ message: "Access token required" });
-
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) return res.status(503).json({ message: "Authentication is not configured" });
-  jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"], issuer: "ledgerlens-pro", audience: "ledgerlens-client" }, (err, user) => {
-    if (err) return res.status(403).json({ message: "Invalid token" });
-    req.user = user;
-    next();
-  });
+
+  let user;
+  try {
+    user = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"], issuer: "ledgerlens-pro", audience: "ledgerlens-client" });
+  } catch {
+    return res.status(403).json({ message: "Invalid or expired session" });
+  }
+  if (!user.demo && user.jti && !databaseConfigured()) return res.status(503).json({ message: "Durable session storage is unavailable. Retry when the workspace database is online." });
+  if (!user.demo && user.jti && databaseConfigured()) {
+    try {
+      const session = await query("SELECT 1 FROM app_sessions s JOIN tenant_memberships m ON m.tenant_id = s.tenant_id AND m.user_id = s.user_id WHERE s.id = $1 AND s.user_id = $2 AND s.tenant_id = $3 AND s.expires_at > now()", [user.jti, user.userId, user.tenantId]);
+      if (!session.rowCount) return res.status(403).json({ message: "This session or workspace access has expired." });
+    } catch (error) { return next(error); }
+  }
+  req.user = user;
+  return next();
 }
 
 export function enforceBrowserOrigin(allowedOrigins) {

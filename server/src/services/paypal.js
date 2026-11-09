@@ -1,4 +1,5 @@
 import axios from "axios";
+import { query } from "./database.js";
 
 const paypalBase = () => process.env.PAYPAL_ENV === "production" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 let tokenCache;
@@ -44,6 +45,18 @@ function normalizedPayPalError(error) {
   return Object.assign(new Error(message), { status: responseStatus });
 }
 
+export function payPalAuthAssertion(payerId) {
+  if (!process.env.PAYPAL_CLIENT_ID || !payerId) throw Object.assign(new Error("PayPal partner identity is not configured."), { status: 503 });
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "none" })}.${encode({ iss: process.env.PAYPAL_CLIENT_ID, payer_id: payerId })}.`;
+}
+
+export async function getMerchantConnection(tenantId) {
+  if (!tenantId) throw Object.assign(new Error("A workspace is required for PayPal access."), { status: 401 });
+  const { rows } = await query("SELECT merchant_id, payer_id, scopes, status FROM paypal_connections WHERE tenant_id = $1", [tenantId]);
+  if (!rows.length || rows[0].status !== "connected") throw Object.assign(new Error("Connect a PayPal merchant account to this workspace first."), { status: 409 });
+  return rows[0];
+}
 export function paypalConfigured() {
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
@@ -67,11 +80,11 @@ async function getAccessToken() {
   finally { tokenRequest = null; }
 }
 
-export async function paypalGet(path, params = {}) {
+export async function paypalGet(path, params = {}, payerId = null) {
   for (let authRetry = 0; authRetry < 2; authRetry++) {
     const token = await getAccessToken();
     try {
-      const { data } = await withPayPalRetry(() => axios.get(`${paypalBase()}${path}`, { params, headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, timeout: 20000 }));
+      const { data } = await withPayPalRetry(() => axios.get(`${paypalBase()}${path}`, { params, headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...(payerId ? { "PayPal-Auth-Assertion": payPalAuthAssertion(payerId) } : {}), ...(process.env.PAYPAL_ATTRIBUTION_ID ? { "PayPal-Partner-Attribution-Id": process.env.PAYPAL_ATTRIBUTION_ID } : {}) }, timeout: 20000 }));
       return data;
     } catch (error) {
       if (error.response?.status === 401 && authRetry === 0) {
@@ -84,8 +97,34 @@ export async function paypalGet(path, params = {}) {
   throw Object.assign(new Error("PayPal authorization could not be refreshed."), { status: 502 });
 }
 
-export async function getBalances(asOfTime) {
-  const data = await paypalGet("/v1/reporting/balances", asOfTime ? { as_of_time: asOfTime } : {});
+export function partnerIntegrationConfigured() {
+  return process.env.PAYPAL_PARTNER_APPROVED === "true" && Boolean(process.env.PAYPAL_PARTNER_MERCHANT_ID && process.env.PAYPAL_ONBOARDING_RETURN_URL && paypalConfigured());
+}
+
+export async function createMerchantOnboardingReferral(trackingId) {
+  if (!partnerIntegrationConfigured()) throw Object.assign(new Error("Third-party PayPal onboarding requires approved partner access and partner environment configuration."), { status: 503 });
+  const token = await getAccessToken();
+  const body = {
+    tracking_id: trackingId,
+    operations: [{ operation: "API_INTEGRATION", api_integration_preference: { rest_api_integration: { integration_method: "PAYPAL", integration_type: "THIRD_PARTY", third_party_details: { features: ["ADVANCED_TRANSACTIONS_SEARCH", "PAYPAL_BALANCE"] } } } }],
+    partner_config_override: { return_url: process.env.PAYPAL_ONBOARDING_RETURN_URL }
+  };
+  try {
+    const { data } = await axios.post(`${paypalBase()}/v2/customer/partner-referrals`, body, { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Auth-Assertion": payPalAuthAssertion(process.env.PAYPAL_PARTNER_MERCHANT_ID), ...(process.env.PAYPAL_ATTRIBUTION_ID ? { "PayPal-Partner-Attribution-Id": process.env.PAYPAL_ATTRIBUTION_ID } : {}) }, timeout: 20000 });
+    const action = data.links?.find(link => link.rel === "action_url")?.href;
+    if (!action || !action.startsWith("https://")) throw Object.assign(new Error("PayPal returned no valid merchant consent URL."), { status: 502 });
+    return action;
+  } catch (error) { throw normalizedPayPalError(error); }
+}
+
+export async function getMerchantIntegration(merchantId) {
+  if (!partnerIntegrationConfigured()) throw Object.assign(new Error("Third-party PayPal onboarding is not configured."), { status: 503 });
+  return paypalGet(`/v1/customer/partners/${encodeURIComponent(process.env.PAYPAL_PARTNER_MERCHANT_ID)}/merchant-integrations/${encodeURIComponent(merchantId)}`, {}, merchantId);
+}
+
+export async function getBalances(asOfTime, tenantId = null) {
+  const connection = tenantId ? await getMerchantConnection(tenantId) : null;
+  const data = await paypalGet("/v1/reporting/balances", asOfTime ? { as_of_time: asOfTime } : {}, connection?.payer_id || null);
   return { ...data, provenance: { endpoint: "/v1/reporting/balances", environment: process.env.PAYPAL_ENV === "production" ? "production" : "sandbox", retrieved_at: new Date().toISOString(), freshness_note: "PayPal states balances may take up to three hours to appear." } };
 }
 
@@ -116,7 +155,8 @@ export function selectAvailablePayPalBalance(response, currencyCode) {
   return { amount, currency: selected.currency, as_of: response.last_refresh_time || response.as_of_time || null, source: "PAYPAL_REPORTING_AVAILABLE_BALANCE" };
 }
 
-export async function listTransactions({ startDate, endDate } = {}) {
+export async function listTransactions({ startDate, endDate, tenantId = null } = {}) {
+  const connection = tenantId ? await getMerchantConnection(tenantId) : null;
   const now = new Date();
   const end = endDate || now.toISOString();
   const start = startDate || new Date(now.getTime() - 30 * 86400000).toISOString();
@@ -126,7 +166,7 @@ export async function listTransactions({ startDate, endDate } = {}) {
   let page = 1;
   let totalPages = 1;
   while (page <= totalPages && page <= 100) {
-    const result = await paypalGet("/v1/reporting/transactions", { start_date: start, end_date: end, page_size: 100, page, fields: "all" });
+    const result = await paypalGet("/v1/reporting/transactions", { start_date: start, end_date: end, page_size: 100, page, fields: "all" }, connection?.payer_id || null);
     totalPages = Number(result.total_pages || 1);
     if (!Number.isFinite(totalPages) || totalPages < 1 || totalPages > 100) throw Object.assign(new Error("Transaction Search result exceeds the configured 10,000-record page limit"), { status: 502 });
     for (const item of result.transaction_details || []) {

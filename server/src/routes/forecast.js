@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get("/", async (req, res, next) => {
+  if (!req.user.demo && !req.user.tenantId) return res.status(409).json({ message: "Connect a PayPal merchant account to a registered workspace first." });
   try {
     const now = new Date();
     const startDate = new Date(now.getTime() - 30 * 86400000).toISOString();
@@ -20,7 +21,7 @@ router.get("/", async (req, res, next) => {
       sourceBalance = { amount: ledger.closingBalance.toNumber(), currency: ledger.currency, source: "SANDBOX_EVIDENCE", as_of: ledger.asOf };
       transactions = ledger.transactions;
     } else {
-      const [balances, history] = await Promise.all([getBalances(), listTransactions({ startDate, endDate })]);
+      const [balances, history] = await Promise.all([getBalances(undefined, req.user.tenantId || null), listTransactions({ startDate, endDate, tenantId: req.user.tenantId || null })]);
       sourceBalance = selectAvailablePayPalBalance(balances, req.query.currency_code);
       transactions = history;
     }
@@ -40,6 +41,7 @@ router.get("/", async (req, res, next) => {
 });
 
 router.post("/simulate", async (req, res, next) => {
+  if (!req.user.demo && !req.user.tenantId) return res.status(409).json({ message: "Connect a PayPal merchant account to a registered workspace first." });
   try {
     const { delay_days = 0, expected_income = 0, emergency_amount = 0, cost_reduction = 0, daily_expense_mean, daily_expense_std = 0, currency_code } = req.body || {};
     for (const [key, value, max] of [["delay_days", delay_days, 77], ["expected_income", expected_income, 100000], ["emergency_amount", emergency_amount, 100000], ["cost_reduction", cost_reduction, 100000], ["daily_expense_mean", daily_expense_mean, 100000], ["daily_expense_std", daily_expense_std, 100000]]) {
@@ -56,7 +58,7 @@ router.post("/simulate", async (req, res, next) => {
       sourceBalance = { amount: ledger.closingBalance.toNumber(), currency: ledger.currency, source: "SANDBOX_EVIDENCE", as_of: ledger.asOf };
       transactions = ledger.transactions;
     } else {
-      const [balances, history] = await Promise.all([getBalances(), listTransactions({ startDate, endDate })]);
+      const [balances, history] = await Promise.all([getBalances(undefined, req.user.tenantId || null), listTransactions({ startDate, endDate, tenantId: req.user.tenantId || null })]);
       sourceBalance = selectAvailablePayPalBalance(balances, currency_code);
       transactions = history;
     }

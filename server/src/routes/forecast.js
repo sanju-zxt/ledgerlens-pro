@@ -1,4 +1,5 @@
 import express from "express";
+import axios from "axios";
 import { forecastCashflow } from "../services/forecast.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { readLedgerEvidence } from "../services/ledger.js";
@@ -30,7 +31,11 @@ router.get("/", async (req, res, next) => {
       return;
     }
     const result = forecastCashflow({ currentBalance: sourceBalance.amount, paymentAmount: 0, dailyExpenseSamples: history.dailySpendSamples, dailyExpenseMean: history.dailyMean, dailyExpenseStd: history.dailyStd, emergencyProbability: 0, emergencyAmount: [0, 0] });
-    res.json({ ...result, forecast_status: "available", model_metadata: metadata, history_profile: { ...history, dailySpendSamples: undefined }, source_balance: sourceBalance });
+    const response = { ...result, forecast_status: "available", model_metadata: metadata, history_profile: { ...history, dailySpendSamples: undefined }, source_balance: { ...sourceBalance, observed_at: now.toISOString() } };
+    // Persist only real PayPal observations as backtest evidence. The checked-in
+    // demo ledger is a static fixture and must never be mistaken for a time series.
+    if (!req.user.demo) axios.post(`${(process.env.ML_ENGINE_URL || "http://127.0.0.1:8001").replace(/\/$/, "")}/pipeline/forecast-snapshots`, { tenant: String(req.user.userId || req.user.email), forecast: response }, { headers: process.env.ML_ENGINE_API_KEY ? { Authorization: `Bearer ${process.env.ML_ENGINE_API_KEY}` } : {}, timeout: 8000 }).catch(error => console.error(`Forecast snapshot was not persisted: ${error.message}`));
+    res.json(response);
   } catch (error) { next(error); }
 });
 

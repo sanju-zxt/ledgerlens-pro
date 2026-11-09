@@ -94,7 +94,7 @@ export function forecastCashflow(input) {
   const endingBreachCount = endings.filter(value => value < reserveThreshold).length;
   const series = paths.map((values, day) => {
     values.sort((a, b) => a - b);
-    return { day, median: percentile(values, 0.5), lower_bound: percentile(values, 0.15), upper_bound: percentile(values, 0.85) };
+    return { day, median: percentile(values, 0.5), lower_bound: percentile(values, 0.15), upper_bound: percentile(values, 0.85), lower_bound_90: percentile(values, 0.05), upper_bound_90: percentile(values, 0.95) };
   });
   return {
     horizon_days: horizon,

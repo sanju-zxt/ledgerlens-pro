@@ -2,6 +2,7 @@
 from typing import List
 import hmac
 import os
+import sqlite3
 from bisect import bisect_left
 from datetime import datetime, timezone
 import numpy as np
@@ -9,6 +10,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import average_precision_score, confusion_matrix, roc_auc_score
+from quality_pipeline import add_label, dataset_report, experiment, export_labels, forecast_report, record_forecast_snapshot, db_session, _rows, latest_experiment, label_history, score_review_labels
 
 app = FastAPI(title="LedgerLens ML Engine", version="1.0.0")
 
@@ -53,6 +55,7 @@ class ForecastRequest(BaseModel):
 class AnomalyRequest(BaseModel):
     transactions: List[Transaction] = Field(max_length=1000)
     sensitivity: float = Field(default=0.1, gt=0, le=0.5)
+    tenant: str | None = Field(default=None, max_length=200)
 
 
 class CalibrationRequest(BaseModel):
@@ -61,9 +64,97 @@ class CalibrationRequest(BaseModel):
     bins: int = Field(default=10, ge=2, le=50)
 
 
+class ReviewedLabelRequest(BaseModel):
+    tenant: str = Field(min_length=1, max_length=200)
+    reviewer: str = Field(min_length=1, max_length=200)
+    transaction: dict
+    label: int = Field(ge=0, le=1)
+    rationale: str = Field(min_length=12, max_length=2000)
+
+
+class ForecastSnapshotRequest(BaseModel):
+    tenant: str = Field(min_length=1, max_length=200)
+    forecast: dict
+
+
+class TenantRequest(BaseModel):
+    tenant: str = Field(min_length=1, max_length=200)
+
+
+def require_durable_store():
+    # In production, default container filesystems are ephemeral. Requiring an
+    # explicitly mounted path prevents the API from claiming persistent labels.
+    if os.getenv("NODE_ENV") == "production" and not os.getenv("MODEL_DATA_PATH"):
+        raise HTTPException(503, "Model-quality data storage is not configured. Set MODEL_DATA_PATH to a durable mounted volume.")
+    try:
+        with db_session(): pass
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(503, "Model-quality data store is unavailable") from exc
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "ml-engine"}
+
+
+@app.get("/pipeline/labels", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_labels(tenant: str):
+    require_durable_store()
+    with db_session() as db:
+        labels = _rows(db, tenant)
+    return {"dataset": dataset_report(tenant), "labels": labels, "label_history": label_history(tenant)}
+
+
+@app.post("/pipeline/labels", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_add_label(request: ReviewedLabelRequest):
+    require_durable_store()
+    try:
+        saved = add_label(request.model_dump(), tenant=request.tenant, reviewer=request.reviewer)
+        return {"saved": True, "label": saved, "dataset": dataset_report(request.tenant)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/pipeline/experiment", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_experiment(tenant: str):
+    require_durable_store()
+    report = latest_experiment(tenant)
+    report["current_dataset_version"] = dataset_report(tenant)["dataset_version"]
+    report["model_current"] = report.get("dataset_version") == report["current_dataset_version"] and report.get("status") == "EVALUATED"
+    return report
+
+
+@app.post("/pipeline/experiment", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_run_experiment(request: TenantRequest):
+    require_durable_store()
+    tenant = request.tenant
+    return experiment(tenant)
+
+
+@app.post("/pipeline/forecast-snapshots", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_snapshot(request: ForecastSnapshotRequest):
+    require_durable_store()
+    return record_forecast_snapshot(request.forecast, tenant=request.tenant)
+
+
+@app.get("/pipeline/forecast-report", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_forecast_report(tenant: str):
+    require_durable_store()
+    return forecast_report(tenant)
+
+
+@app.get("/pipeline/report", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_report(tenant: str):
+    require_durable_store()
+    return {"generated_at": utcnow(), "dataset": dataset_report(tenant), "classification_experiment": latest_experiment(tenant), "forecast_backtest": forecast_report(tenant)}
+
+
+@app.get("/pipeline/export-labels", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_export_labels(tenant: str):
+    require_durable_store()
+    from fastapi.responses import PlainTextResponse
+    from quality_pipeline import export_labels
+    return PlainTextResponse(export_labels(tenant), media_type="text/csv")
 
 
 @app.post("/forecast", dependencies=[Depends(require_internal_api_key)])
@@ -98,7 +189,7 @@ async def forecast(request: ForecastRequest):
         path_breached |= balances < request.reserve_threshold
         if day == horizon:
             ending_breached = balances < request.reserve_threshold
-        series.append({"day": day, "median": float(np.percentile(balances, 50)), "lower_bound": float(np.percentile(balances, 15)), "upper_bound": float(np.percentile(balances, 85))})
+        series.append({"day": day, "median": float(np.percentile(balances, 50)), "lower_bound": float(np.percentile(balances, 15)), "upper_bound": float(np.percentile(balances, 85)), "lower_bound_90": float(np.percentile(balances, 5)), "upper_bound_90": float(np.percentile(balances, 95))})
     path_breach_count = int(np.count_nonzero(path_breached))
     ending_breach_count = int(np.count_nonzero(ending_breached))
     required_events = int(np.ceil(n * 0.5))
@@ -196,7 +287,22 @@ async def detect_anomaly(request: AnomalyRequest):
                 "features": {"currency_batch_median_abs_amount": median, "robust_amount_z": float(metadata["amount_z"]), "description_category_prior_frequency": metadata["peer_prior"], "previous_24h_transaction_count": metadata["previous_24h"], "previous_7d_transaction_count": metadata["previous_7d"], "time_of_week_hour": metadata["week_hour"]}
             })
     message = "At least 3 completed transactions per currency are required for analysis." if skipped and not anomalies else None
-    return {"anomalies": anomalies, "message": message, "total_checked": len(eligible), "skipped_currency_groups": skipped, "feature_set": ["log absolute amount", "transaction direction", "robust amount deviation", "prior-only merchant/category frequency", "prior 24-hour and 7-day transaction velocity", "time of week", "currency-isolated Isolation Forest"], "interpretation": "Statistical outliers are review prompts, not confirmed fraud. Batch-relative signals are not merchant history. Precision, recall, and F1 are unverified without independent anomaly labels."}
+    supervised = {"active": False, "reason": "No tenant-scoped model context was supplied."}
+    if request.tenant:
+        try:
+            supervised = score_review_labels(request.tenant, [tx.model_dump() for tx in request.transactions])
+            score_by_index = {int(item["index"]): item for item in supervised.get("scores", [])}
+            for anomaly in anomalies:
+                score = score_by_index.get(anomaly["index"])
+                if score: anomaly["probability_unusual"] = score["probability_unusual"]
+            already = {item["index"] for item in anomalies}
+            for index, tx in eligible:
+                score = score_by_index.get(index)
+                if score and score["threshold_met"] and index not in already:
+                    anomalies.append({"index": index, "transaction": tx.model_dump(), "score": score["probability_unusual"], "probability_unusual": score["probability_unusual"], "reason": "The versioned supervised review model assigned a probability at or above its 0.5 review threshold; this is an unusualness signal, not a fraud conclusion.", "features": {"model_version": supervised["model_version"], "dataset_version": supervised["dataset_version"]}})
+        except (OSError, sqlite3.Error, ValueError, KeyError) as exc:
+            supervised = {"active": False, "reason": f"Validated model unavailable: {type(exc).__name__}"}
+    return {"anomalies": anomalies, "message": message, "total_checked": len(eligible), "skipped_currency_groups": skipped, "feature_set": ["log absolute amount", "transaction direction", "robust amount deviation", "prior-only merchant/category frequency", "prior 24-hour and 7-day transaction velocity", "time of week", "currency-isolated Isolation Forest"], "supervised_model": supervised, "interpretation": "Statistical outliers are review prompts, not confirmed fraud. Supervised model output is activated only after tenant-scoped chronological validation and an untouched test Brier skill above the training prevalence baseline. No output confirms fraud."}
 
 
 @app.post("/calibration", dependencies=[Depends(require_internal_api_key)])

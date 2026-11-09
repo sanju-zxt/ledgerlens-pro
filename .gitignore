@@ -22,3 +22,5 @@ __pycache__/
 .pfx
 .p12
 .venv-audit/
+ml-engine/data/
+ml-engine/models/

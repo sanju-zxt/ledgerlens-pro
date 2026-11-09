@@ -10,11 +10,13 @@ test("health endpoint is available without exposing account data", async () => {
   assert.equal(response.body.status, "ok");
 });
 
-test("forecast, ledger, PayPal, and dashboard routes require a valid session", async () => {
-  for (const path of ["/api/forecast", "/api/transactions", "/api/paypal/status", "/api/dashboard/summary", "/api/evidence/manifest"]) {
+test("forecast, ledger, PayPal, dashboard, and model-quality routes require a valid session", async () => {
+  for (const path of ["/api/forecast", "/api/transactions", "/api/paypal/status", "/api/dashboard/summary", "/api/evidence/manifest", "/api/analysis/pipeline", "/api/analysis/experiment", "/api/analysis/forecast-report", "/api/analysis/evaluation-report"]) {
     const response = await request(app).get(path);
     assert.equal(response.status, 401, `${path} should require a valid session`);
   }
+  const label = await request(app).post("/api/analysis/labels").send({ transaction_id: "fake", source: "SANDBOX_EVIDENCE", label: 1, rationale: "A plausible reason for the label" });
+  assert.equal(label.status, 401);
 });
 
 test("configured login and explicit sandbox demo session expose only their supported data", async () => {
@@ -39,6 +41,7 @@ test("configured login and explicit sandbox demo session expose only their suppo
     const demoAgent = request.agent(app);
     const demoLogin = await demoAgent.post("/api/auth/demo").send({});
     assert.equal(demoLogin.status, 200);
+    await demoAgent.post("/api/analysis/labels").send({ transaction_key: "browser-invented-id|0|", source: "SANDBOX_EVIDENCE", label: 1, rationale: "A test rationale with sufficient length" }).expect(404);
     const forecast = await demoAgent.get("/api/forecast");
     assert.equal(forecast.status, 200);
     assert.equal(forecast.body.forecast_status, "insufficient_history");

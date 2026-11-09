@@ -1,0 +1,73 @@
+{
+  "title": "Controlled synthetic anomaly benchmark",
+  "status": "SYNTHETIC BENCHMARK ONLY",
+  "not_customer_evidence": true,
+  "generated_at": "2026-11-09T05:18:30.135716+00:00",
+  "dataset": {
+    "version": "controlled-patterns-v1-seed-20261109",
+    "generator": "ml-engine/synthetic_benchmark.py",
+    "seed": 20261109,
+    "total": 4000,
+    "positive_definition": "Known injected amount, velocity, merchant-rarity, or unusual-hour pattern; 2.5% labels flipped as controlled noise.",
+    "features": [
+      "robust_amount_deviation",
+      "prior_24h_velocity",
+      "merchant_rarity",
+      "unusual_hour"
+    ]
+  },
+  "split": {
+    "method": "chronological contiguous blocks",
+    "train": 2400,
+    "calibration": 600,
+    "validation": 400,
+    "test": 600,
+    "selection": "validation Brier only; test used once after selection"
+  },
+  "model_version": "synthetic-benchmark-v1",
+  "selected_candidate": "hist_gradient_boosting+isotonic",
+  "validation_brier": 0.023702215219126955,
+  "test": {
+    "sample_size": 600,
+    "positives": 83,
+    "negatives": 517,
+    "roc_auc": 0.9476707604110833,
+    "pr_auc": 0.8836898505939719,
+    "precision_at_0_5": 0.9358974358974359,
+    "recall_at_0_5": 0.8795180722891566,
+    "f1_at_0_5": 0.906832298136646,
+    "brier": 0.02321033402715055,
+    "log_loss": 0.10578822130432715,
+    "confusion_matrix_at_0_5": {
+      "tn": 512,
+      "fp": 5,
+      "fn": 10,
+      "tp": 73
+    }
+  },
+  "baseline": {
+    "name": "training-prevalence constant probability",
+    "sample_size": 600,
+    "positives": 83,
+    "negatives": 517,
+    "roc_auc": 0.5,
+    "pr_auc": 0.13833333333333334,
+    "precision_at_0_5": 0.0,
+    "recall_at_0_5": 0.0,
+    "f1_at_0_5": 0.0,
+    "brier": 0.1192890625,
+    "log_loss": 0.4022974947876738,
+    "confusion_matrix_at_0_5": {
+      "tn": 517,
+      "fp": 0,
+      "fn": 83,
+      "tp": 0
+    }
+  },
+  "brier_skill_vs_baseline": 0.8054278108929681,
+  "limitations": [
+    "Controlled generated distribution; not representative PayPal/customer data.",
+    "Does not establish real-world detection, calibration, or fraud performance.",
+    "Do not combine these values with reviewed-label or production scorecards."
+  ]
+}

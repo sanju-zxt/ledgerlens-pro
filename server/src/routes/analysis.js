@@ -33,8 +33,9 @@ router.get("/pipeline", async (req, res, next) => {
       req.user.demo ? Promise.resolve(readLedgerEvidence().transactions) : listTransactions({})
     ]);
     const reviewed = new Set(store.data.labels.map(label => label.transaction_id));
+    const triaged = new Set((store.data.triage_queue || []).map(item => item.transaction_id));
     const eligible = txs.filter(transaction => ["COMPLETED", "S"].includes(String(transaction.status || "").toUpperCase()));
-    res.json({ ...store.data, source: req.user.demo ? "SANDBOX_EVIDENCE" : "PAYPAL_TRANSACTION_SEARCH", retrieved_at: new Date().toISOString(), candidates: eligible.map(transaction => ({ ...transaction, review_key: transactionKey(transaction), already_reviewed: reviewed.has(transactionKey(transaction)) })) });
+    res.json({ ...store.data, source: req.user.demo ? "SANDBOX_EVIDENCE" : "PAYPAL_TRANSACTION_SEARCH", retrieved_at: new Date().toISOString(), candidates: eligible.map(transaction => ({ ...transaction, review_key: transactionKey(transaction), already_reviewed: reviewed.has(transactionKey(transaction)), needs_investigation: triaged.has(transactionKey(transaction)) })) });
   } catch (error) { next(error); }
 });
 
@@ -50,6 +51,21 @@ router.post("/labels", async (req, res, next) => {
     if (!["COMPLETED", "S"].includes(String(transaction.status || "").toUpperCase())) return res.status(422).json({ message: "Only completed transactions can be included in this anomaly-label dataset." });
     if (!transaction.id || !transaction.date || !transaction.currency || !Number.isFinite(Number(transaction.amount))) return res.status(422).json({ message: "Source transaction lacks required evidence fields and cannot be labeled." });
     const result = await callPipeline(req, "labels", "post", { tenant: tenantId(req), reviewer: String(req.user.email || req.user.userId), transaction, label, rationale: rationale.trim() });
+    res.status(201).json(result.data);
+  } catch (error) { next(error); }
+});
+
+router.post("/review-status", async (req, res, next) => {
+  try {
+    const { transaction_key, rationale, source } = req.body || {};
+    if (typeof transaction_key !== "string" || transaction_key.length > 500 || typeof rationale !== "string" || rationale.trim().length < 12 || rationale.length > 2000) return res.status(400).json({ message: "Select a transaction and provide an evidence-based rationale (12–2000 characters)." });
+    if (source === "PAYPAL_TRANSACTION_SEARCH" && req.user.demo) return res.status(403).json({ message: "Demo accounts can review only checked-in sandbox evidence." });
+    const transactions = source === "SANDBOX_EVIDENCE" && req.user.demo ? readLedgerEvidence().transactions : source === "PAYPAL_TRANSACTION_SEARCH" && !req.user.demo ? await listTransactions({}) : null;
+    if (!transactions) return res.status(400).json({ message: "The submitted source is not available for this account." });
+    const transaction = transactions.find(item => transactionKey(item) === transaction_key);
+    if (!transaction) return res.status(404).json({ message: "That transaction was not returned by the selected verified source." });
+    if (!["COMPLETED", "S"].includes(String(transaction.status || "").toUpperCase())) return res.status(422).json({ message: "Only completed transactions can be marked for investigation." });
+    const result = await callPipeline(req, "review-status", "post", { tenant: tenantId(req), reviewer: String(req.user.email || req.user.userId), status: "needs_investigation", rationale: rationale.trim(), transaction });
     res.status(201).json(result.data);
   } catch (error) { next(error); }
 });

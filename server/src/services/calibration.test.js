@@ -6,6 +6,7 @@ test("calibration metrics use the documented equal-width convention and prevalen
   const result = calculateCalibration([{ prediction: 0.1, label: 0 }, { prediction: 0.9, label: 1 }], 10);
   assert.ok(Math.abs(result.brier_score - 0.01) < 1e-12);
   assert.equal(result.baseline_brier_score, 0.25);
+  assert.ok(Math.abs(result.log_loss - (-Math.log(0.9))) < 1e-12);
   assert.equal(result.brier_skill_score, 0.96);
   assert.ok(Math.abs(result.expected_calibration_error - 0.1) < 1e-12);
   assert.equal(result.reliability_bins.length, 10);
@@ -21,6 +22,10 @@ test("checked-in calibration metrics are computed from source rows", () => {
   const result = readCalibrationEvidence();
   assert.equal(result.n_samples, 646);
   assert.equal(result.source, "evidence/calibration_data.csv");
+  assert.match(result.dataset_version, /^[a-f0-9]{64}$/);
+  assert.equal(result.model_version, null);
+  assert.equal(result.evaluation_period.start, null);
+  assert.ok(result.last_evaluated_at);
   assert.ok(result.brier_score >= 0 && result.brier_score <= 1);
   assert.ok(result.expected_calibration_error >= 0 && result.expected_calibration_error <= 1);
   assert.equal(result.positive_count, 0);

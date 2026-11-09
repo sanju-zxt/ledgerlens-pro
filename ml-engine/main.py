@@ -5,12 +5,13 @@ import os
 import sqlite3
 from bisect import bisect_left
 from datetime import datetime, timezone
+from pathlib import Path
 import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import average_precision_score, confusion_matrix, roc_auc_score
-from quality_pipeline import add_label, dataset_report, experiment, export_labels, forecast_report, record_forecast_snapshot, db_session, _rows, latest_experiment, label_history, score_review_labels
+from quality_pipeline import add_label, dataset_report, experiment, export_labels, forecast_report, record_forecast_snapshot, db_session, _rows, latest_experiment, label_history, triage_history, mark_needs_investigation, score_review_labels
 
 app = FastAPI(title="LedgerLens ML Engine", version="1.0.0")
 
@@ -72,6 +73,14 @@ class ReviewedLabelRequest(BaseModel):
     rationale: str = Field(min_length=12, max_length=2000)
 
 
+class ReviewStatusRequest(BaseModel):
+    tenant: str = Field(min_length=1, max_length=200)
+    reviewer: str = Field(min_length=1, max_length=200)
+    transaction: dict
+    status: str = Field(pattern="^needs_investigation$")
+    rationale: str = Field(min_length=12, max_length=2000)
+
+
 class ForecastSnapshotRequest(BaseModel):
     tenant: str = Field(min_length=1, max_length=200)
     forecast: dict
@@ -81,11 +90,26 @@ class TenantRequest(BaseModel):
     tenant: str = Field(min_length=1, max_length=200)
 
 
+def persistent_store_configured() -> bool:
+    configured_path = os.getenv("MODEL_DATA_PATH")
+    if not configured_path:
+        return False
+    if os.getenv("RENDER_EXTERNAL_HOSTNAME"):
+        mount = Path("/var/data").resolve()
+        if not Path(configured_path).resolve().is_relative_to(mount) or not os.path.ismount(str(mount)):
+            return False
+    return True
+
+
 def require_durable_store():
     # In production, default container filesystems are ephemeral. Requiring an
     # explicitly mounted path prevents the API from claiming persistent labels.
-    if os.getenv("NODE_ENV") == "production" and not os.getenv("MODEL_DATA_PATH"):
-        raise HTTPException(503, "Model-quality data storage is not configured. Set MODEL_DATA_PATH to a durable mounted volume.")
+    if os.getenv("NODE_ENV") == "production":
+        configured_path = os.getenv("MODEL_DATA_PATH")
+        if not configured_path:
+            raise HTTPException(503, "Model-quality data storage is not configured. Set MODEL_DATA_PATH to a durable mounted volume.")
+        if not persistent_store_configured():
+            raise HTTPException(503, "Model-quality storage path is outside the configured Render persistent-disk mount (/var/data).")
     try:
         with db_session(): pass
     except (OSError, sqlite3.Error) as exc:
@@ -94,7 +118,10 @@ def require_durable_store():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ml-engine"}
+    production = os.getenv("NODE_ENV") == "production"
+    durable_store = persistent_store_configured()
+    auth_configured = bool(os.getenv("ML_ENGINE_API_KEY"))
+    return {"status": "ok", "service": "ml-engine", "internal_auth_configured": auth_configured, "persistent_model_store_configured": durable_store, "ready_for_model_data": (auth_configured and durable_store) if production else True}
 
 
 @app.get("/pipeline/labels", dependencies=[Depends(require_internal_api_key)])
@@ -102,7 +129,8 @@ async def pipeline_labels(tenant: str):
     require_durable_store()
     with db_session() as db:
         labels = _rows(db, tenant)
-    return {"dataset": dataset_report(tenant), "labels": labels, "label_history": label_history(tenant)}
+        triage = [dict(row) for row in db.execute("SELECT * FROM review_triage WHERE tenant_id=? ORDER BY reviewed_at DESC", (tenant,))]
+    return {"dataset": dataset_report(tenant), "labels": labels, "label_history": label_history(tenant), "triage_queue": triage, "triage_history": triage_history(tenant)}
 
 
 @app.post("/pipeline/labels", dependencies=[Depends(require_internal_api_key)])
@@ -111,6 +139,15 @@ async def pipeline_add_label(request: ReviewedLabelRequest):
     try:
         saved = add_label(request.model_dump(), tenant=request.tenant, reviewer=request.reviewer)
         return {"saved": True, "label": saved, "dataset": dataset_report(request.tenant)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/pipeline/review-status", dependencies=[Depends(require_internal_api_key)])
+async def pipeline_review_status(request: ReviewStatusRequest):
+    require_durable_store()
+    try:
+        return mark_needs_investigation(request.model_dump(), tenant=request.tenant, reviewer=request.reviewer)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

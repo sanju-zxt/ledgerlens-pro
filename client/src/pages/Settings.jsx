@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { api, apiUrl } from "../services/api"
+import { Link } from "react-router-dom"
 
 const evidenceFiles = [
   ["/evidence/balance_logs.csv", "Balance ledger CSV"],
@@ -12,13 +13,16 @@ const evidenceFiles = [
 export default function Settings() {
   const status = useQuery({ queryKey: ["paypal-status"], queryFn: () => api.get("/paypal/status"), retry: false })
   const balance = useQuery({ queryKey: ["paypal-balance"], queryFn: () => api.get("/paypal/balances"), enabled: Boolean(status.data?.configured), retry: false })
+  const verify = useMutation({ mutationFn: () => api.get("/paypal/verification") })
   return <section className="space-y-5">
     <header><p className="text-sm font-semibold uppercase tracking-wider text-primary-600">Workspace</p><h1 className="mt-1 text-3xl font-bold">Settings & data sources</h1><p className="mt-2 text-slate-500">Connection status, source freshness and evidence integrity.</p></header>
     <div className="card">
       <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">LIVE DATA SOURCE</p><h2 className="mt-2 text-lg font-semibold">PayPal Reporting API</h2><p className="mt-1 text-sm text-slate-500">Server-to-server Client Credentials integration using PayPal reporting scopes. Environment-variable presence does not confirm that PayPal has granted access.</p></div><span className={`rounded-full px-3 py-1 text-sm ${status.data?.configured ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>{status.isLoading ? "Checking…" : status.error ? "Status unavailable" : status.data?.configured ? `Credentials present · ${status.data.environment}` : status.data?.demoMode ? "Sandbox evidence only" : "Not configured"}</span></div>
       {status.error ? <p role="alert" className="mt-4 text-sm text-red-700">{status.error.message}</p> : <p className="mt-4 text-sm text-slate-600">{status.data?.note || "Checking API configuration…"}</p>}
       {!status.isLoading && !status.error && !status.data?.configured && <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-800">Connect a PayPal Sandbox app</h3><ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-slate-600"><li>Create a Sandbox REST app in the PayPal Developer Dashboard.</li><li>Add <code>PAYPAL_ENV=sandbox</code>, <code>PAYPAL_CLIENT_ID</code> and <code>PAYPAL_CLIENT_SECRET</code> to the server environment.</li><li>Restart LedgerLens, then use “Fetch PayPal balances” when the credentials show as ready.</li></ol><p className="mt-2 text-[10px] text-slate-500">Credentials stay on the server. This uses PayPal server-to-server reporting access; it does not link a personal merchant account through a consent screen.</p></div>}
-      {status.data?.configured && <button className="btn-primary mt-4" onClick={() => balance.refetch()} disabled={balance.isFetching}>{balance.isFetching ? "Refreshing…" : "Fetch PayPal balances"}</button>}
+      {status.data?.configured && <div className="mt-4 flex flex-wrap gap-3"><button className="btn-primary" onClick={() => balance.refetch()} disabled={balance.isFetching}>{balance.isFetching ? "Refreshing…" : "Fetch PayPal balances"}</button><Link className="btn-secondary" to="/transactions">Fetch PayPal transactions →</Link><button className="btn-secondary" onClick={() => verify.mutate()} disabled={verify.isPending}>{verify.isPending ? "Checking PayPal…" : "Verify both Reporting endpoints"}</button></div>}
+      {verify.data && <div className={`mt-3 rounded-lg p-4 text-sm ${verify.data.status === "PASS" ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}><strong>{verify.data.status}</strong> · {verify.data.environment} · {new Date(verify.data.captured_at).toLocaleString()}<p className="mt-1">Scope: {verify.data.account_scope}</p><ul className="mt-2 space-y-1">{Object.entries(verify.data.checks).map(([key, check]) => <li key={key}>{key.replaceAll("_", " ")}: {check.status}{check.returned_count != null ? ` · ${check.returned_count} transactions` : ""}{check.currencies?.length ? ` · ${check.currencies.join(", ")}` : ""}{check.error ? ` · ${check.error}` : ""}</li>)}</ul><p className="mt-2 text-xs">Transaction IDs, descriptions, amounts, OAuth tokens and credentials are excluded from this verification response.</p></div>}
+      {verify.error && <p role="alert" className="mt-3 text-sm text-red-700">{verify.error.message}</p>}
       {balance.error && <p role="alert" className="mt-3 text-sm text-red-700">{balance.error.message}</p>}
       {balance.data && <div className="mt-4 rounded-lg bg-slate-50 p-4 text-sm"><p>Retrieved: {new Date(balance.data.provenance.retrieved_at).toLocaleString()}</p><p className="mt-1">{balance.data.provenance.freshness_note}</p>{balance.data.balances?.map((item, index) => <p key={index} className="mt-2">{item.currency}: available {item.available_balance?.value}, withheld {item.withheld_balance?.value}, total {item.total_balance?.value}</p>)}</div>}
     </div>

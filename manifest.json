@@ -1,6 +1,6 @@
 {
-  "git": "add7a5f7cfe6c41199e513e0a4597556bec43e7d",
-  "generated_at": "2026-11-08T11:19:42.859Z",
+  "git": "e9d3b8c58e61f60a9549ee21446d8deaffd85790",
+  "generated_at": "2026-11-09T04:44:28.347Z",
   "files": {
     "evidence/balance_logs.csv": {
       "sha256": "99e91aaa8a9a37fb5843164e8847abb817662b7b0c7be102ac85a9572ba215cd",
@@ -17,6 +17,10 @@
     "evidence/paypal_api_responses/balance_response.json": {
       "sha256": "05345eb698784c850a3d45f528f7bf74fe9e54b3cc844bb50b78c8d0505ebdff",
       "size": 420
+    },
+    "evidence/paypal_sandbox_verification.json": {
+      "sha256": "ef9a04109ec9d0412242a4655783ca057198de7ea2eb8f65e294c341de77de30",
+      "size": 777
     }
   }
 }

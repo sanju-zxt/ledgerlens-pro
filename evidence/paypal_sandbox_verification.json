@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-09T04:44:24.006Z",
+  "environment": "sandbox",
+  "credential_values_recorded": false,
+  "account_scope": "PayPal account associated with these Sandbox app credentials; not arbitrary merchants",
+  "checks": {
+    "reporting_balances": {
+      "status": "PASS",
+      "endpoint": "/v1/reporting/balances",
+      "currencies": [
+        "USD"
+      ],
+      "refreshed_at": "2026-11-09T02:59:59Z"
+    },
+    "transaction_search": {
+      "status": "PASS",
+      "endpoint": "/v1/reporting/transactions",
+      "period": {
+        "start": "2026-10-10T04:44:26.840Z",
+        "end": "2026-11-09T04:44:26.840Z"
+      },
+      "returned_count": 1,
+      "completed_count": 1,
+      "currencies": [
+        "USD"
+      ]
+    }
+  }
+}

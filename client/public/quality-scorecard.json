@@ -1,30 +1,1382 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-09T04:04:06.889Z",
+  "generatedAt": "2026-11-09T05:18:30.366Z",
   "generator": "scripts/generate-quality-scorecard.mjs",
   "policy": "No aggregate score is calculated. Metrics without sufficient, relevant evidence are NOT EVALUABLE.",
   "integrity": {
-    "verified": 4,
-    "total": 4,
+    "verified": 5,
+    "total": 5,
     "failures": []
   },
   "calibration": {
     "source": "evidence/calibration_data.csv",
     "sampleSize": 646,
     "positiveLabels": 0,
+    "negativeLabels": 646,
+    "datasetVersion": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
     "brier": 0.05483181749345456,
+    "logLoss": 0.23582767450351513,
     "descriptiveEce": 0.20086939974177764,
     "descriptiveBrierSkill": null
+  },
+  "targetScorecard": {
+    "synthetic_benchmark": {
+      "title": "Controlled synthetic anomaly benchmark",
+      "status": "SYNTHETIC BENCHMARK ONLY",
+      "not_customer_evidence": true,
+      "generated_at": "2026-11-09T05:18:30.135716+00:00",
+      "dataset": {
+        "version": "controlled-patterns-v1-seed-20261109",
+        "generator": "ml-engine/synthetic_benchmark.py",
+        "seed": 20261109,
+        "total": 4000,
+        "positive_definition": "Known injected amount, velocity, merchant-rarity, or unusual-hour pattern; 2.5% labels flipped as controlled noise.",
+        "features": [
+          "robust_amount_deviation",
+          "prior_24h_velocity",
+          "merchant_rarity",
+          "unusual_hour"
+        ]
+      },
+      "split": {
+        "method": "chronological contiguous blocks",
+        "train": 2400,
+        "calibration": 600,
+        "validation": 400,
+        "test": 600,
+        "selection": "validation Brier only; test used once after selection"
+      },
+      "model_version": "synthetic-benchmark-v1",
+      "selected_candidate": "hist_gradient_boosting+isotonic",
+      "validation_brier": 0.023702215219126955,
+      "test": {
+        "sample_size": 600,
+        "positives": 83,
+        "negatives": 517,
+        "roc_auc": 0.9476707604110833,
+        "pr_auc": 0.8836898505939719,
+        "precision_at_0_5": 0.9358974358974359,
+        "recall_at_0_5": 0.8795180722891566,
+        "f1_at_0_5": 0.906832298136646,
+        "brier": 0.02321033402715055,
+        "log_loss": 0.10578822130432715,
+        "confusion_matrix_at_0_5": {
+          "tn": 512,
+          "fp": 5,
+          "fn": 10,
+          "tp": 73
+        }
+      },
+      "baseline": {
+        "name": "training-prevalence constant probability",
+        "sample_size": 600,
+        "positives": 83,
+        "negatives": 517,
+        "roc_auc": 0.5,
+        "pr_auc": 0.13833333333333334,
+        "precision_at_0_5": 0,
+        "recall_at_0_5": 0,
+        "f1_at_0_5": 0,
+        "brier": 0.1192890625,
+        "log_loss": 0.4022974947876738,
+        "confusion_matrix_at_0_5": {
+          "tn": 517,
+          "fp": 0,
+          "fn": 83,
+          "tp": 0
+        }
+      },
+      "brier_skill_vs_baseline": 0.8054278108929681,
+      "limitations": [
+        "Controlled generated distribution; not representative PayPal/customer data.",
+        "Does not establish real-world detection, calibration, or fraud performance.",
+        "Do not combine these values with reviewed-label or production scorecards."
+      ]
+    },
+    "classification": [
+      {
+        "name": "ROC-AUC",
+        "key": "rocAuc",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≥80%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≥90%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≥95%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "PR-AUC",
+        "key": "prAuc",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≥50%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≥75%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≥90%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Precision",
+        "key": "precision",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≥80%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≥90%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≥95%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Recall",
+        "key": "recall",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≥80%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≥90%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≥95%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "F1-score",
+        "key": "f1",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≥80%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≥90%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≥95%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Brier score",
+        "key": "brier",
+        "current_value": 0.05483181749345456,
+        "display_value": "0.054832",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤0.15",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤0.10",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤0.05",
+            "status": "BELOW"
+          }
+        ]
+      },
+      {
+        "name": "Log loss",
+        "key": "logLoss",
+        "current_value": 0.23582767450351513,
+        "display_value": "0.235828",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤0.50",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤0.30",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤0.20",
+            "status": "BELOW"
+          }
+        ]
+      },
+      {
+        "name": "ECE",
+        "key": "ece",
+        "current_value": 0.20086939974177764,
+        "display_value": "20.087%",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": "not supplied with evidence file",
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤5%",
+            "status": "BELOW"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤3%",
+            "status": "BELOW"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤1%",
+            "status": "BELOW"
+          }
+        ]
+      }
+    ],
+    "forecasting": [
+      {
+        "name": "WAPE",
+        "key": "wape",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Live PayPal forecast snapshots matched to later observed balances (walk-forward)",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤15%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤10%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤5%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Normalized MAE",
+        "key": "normalized_mae",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Live PayPal forecast snapshots matched to later observed balances (walk-forward)",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤10%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤5%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤2%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Normalized RMSE",
+        "key": "normalized_rmse",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Live PayPal forecast snapshots matched to later observed balances (walk-forward)",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤20%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤10%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤5%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Absolute bias",
+        "key": "absolute_bias",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Live PayPal forecast snapshots matched to later observed balances (walk-forward)",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "≤5%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "≤2%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "≤1%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "70% interval coverage",
+        "key": "coverage_70",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Live PayPal forecast snapshots matched to later observed balances (walk-forward)",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "65–75%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "68–72%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "69–71%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "90% interval coverage",
+        "key": "coverage_90",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Live PayPal forecast snapshots matched to later observed balances (walk-forward)",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
+        "tiers": [
+          {
+            "tier": "Good",
+            "target": "85–95%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent",
+            "target": "88–92%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Stretch target",
+            "target": "89–91%",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      }
+    ],
+    "improvement_over_baseline": [
+      {
+        "name": "Brier skill",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Independent chronological held-out model and baseline comparison",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "tiers": [
+          {
+            "tier": "Next target",
+            "target": ">0.10",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent target",
+            "target": ">0.20",
+            "status": "NOT EVALUABLE"
+          }
+        ],
+        "reason": "No paired model and meaningful baseline scores from an independent held-out sample."
+      },
+      {
+        "name": "Log-loss skill",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Independent chronological held-out model and baseline comparison",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "tiers": [
+          {
+            "tier": "Next target",
+            "target": ">0.10",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent target",
+            "target": ">0.20",
+            "status": "NOT EVALUABLE"
+          }
+        ],
+        "reason": "No paired model and meaningful baseline scores from an independent held-out sample."
+      },
+      {
+        "name": "Forecast MAE improvement",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Independent chronological held-out model and baseline comparison",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "tiers": [
+          {
+            "tier": "Next target",
+            "target": ">0.10",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent target",
+            "target": ">0.20",
+            "status": "NOT EVALUABLE"
+          }
+        ],
+        "reason": "No paired model and meaningful baseline scores from an independent held-out sample."
+      },
+      {
+        "name": "Forecast RMSE improvement",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Independent chronological held-out model and baseline comparison",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "tiers": [
+          {
+            "tier": "Next target",
+            "target": ">0.10",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Excellent target",
+            "target": ">0.20",
+            "status": "NOT EVALUABLE"
+          }
+        ],
+        "reason": "No paired model and meaningful baseline scores from an independent held-out sample."
+      }
+    ],
+    "data_requirements": [
+      {
+        "name": "Total reviewed transactions",
+        "minimum": "100",
+        "recommended": "2,000+",
+        "current": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Source-verified human-reviewed label store or live walk-forward forecast store",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
+      },
+      {
+        "name": "Reviewed unusual transactions",
+        "minimum": "10",
+        "recommended": "200–500+",
+        "current": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Source-verified human-reviewed label store or live walk-forward forecast store",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
+      },
+      {
+        "name": "Reviewed expected transactions",
+        "minimum": "10",
+        "recommended": "1,000+",
+        "current": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Source-verified human-reviewed label store or live walk-forward forecast store",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
+      },
+      {
+        "name": "Calibration observations",
+        "minimum": "10 per class",
+        "recommended": "200+ per class",
+        "current": "646 total; 0 positive; 646 negative",
+        "sample_size": 646,
+        "measurement_source": "evidence/calibration_data.csv",
+        "dataset_version": "5dd2c9d8d2de65efca9b95cba95604274e75c4f487b4b16a8c8c4c06c202df50",
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
+      },
+      {
+        "name": "Forecast matched snapshots",
+        "minimum": "30 per horizon",
+        "recommended": "100–300 per horizon",
+        "current": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Source-verified human-reviewed label store or live walk-forward forecast store",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
+      }
+    ],
+    "overall_quality": [
+      {
+        "name": "Data provenance",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "100% traceability",
+        "sample_size": 0,
+        "measurement_source": "Requires independent operational or dataset evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Tenant isolation",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "100% passing verified boundary tests",
+        "sample_size": 0,
+        "measurement_source": "Requires independent operational or dataset evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Evaluation reproducibility",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "100% repeated-run agreement",
+        "sample_size": 0,
+        "measurement_source": "Requires independent operational or dataset evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Required-field completeness",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "≥99%",
+        "sample_size": 0,
+        "measurement_source": "Requires independent operational or dataset evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Duplicate verified records",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "0",
+        "sample_size": 0,
+        "measurement_source": "Requires independent operational or dataset evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Artifact version integrity",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "100% checksum verification",
+        "sample_size": 0,
+        "measurement_source": "Requires independent operational or dataset evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Critical-path test coverage",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "target": "100%",
+        "sample_size": 57,
+        "measurement_source": "npm test:server, npm test:ml, npm test:evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Evidence source does not currently provide this measurement."
+      },
+      {
+        "name": "Unit/integration/API test pass rate",
+        "current_value": 1,
+        "display_value": "100.0%",
+        "target": "98–100%",
+        "sample_size": 57,
+        "measurement_source": "npm test:server, npm test:ml, npm test:evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "MEASURED",
+        "reason": "Suite pass rate only; not a model or financial accuracy score."
+      }
+    ],
+    "engineering_evidence": [
+      {
+        "name": "Financial calculation correctness",
+        "current_value": "3/3 fixture invariants",
+        "display_value": "3/3 fixture invariants",
+        "sample_size": 2,
+        "measurement_source": "Decimal ledger reconciliation, event sequence, duplicate transaction-ID assertions",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "PASS",
+        "reason": "One checked-in sandbox ledger fixture only; not production or multicurrency certification.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "100% of validated cases",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "MEASURED"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Evidence file verification",
+        "current_value": "5/5 files",
+        "display_value": "5/5 files",
+        "sample_size": 5,
+        "measurement_source": "manifest.json SHA-256 and byte-size verification",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "PASS",
+        "reason": "Verifies file integrity against the repository manifest, not independent source authenticity.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "100% SHA-256 and size match",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "MEASURED"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "PayPal Sandbox Reporting integration",
+        "current_value": "Balances PASS; Transaction Search PASS (1 rows)",
+        "display_value": "Balances PASS; Transaction Search PASS (1 rows)",
+        "sample_size": 1,
+        "measurement_source": "PayPal Sandbox Reporting API; sanitized local verification",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "PASS",
+        "reason": "PayPal account associated with these Sandbox app credentials; not arbitrary merchants",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "Both Reporting endpoints succeed",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "MEASURED"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Unit/integration/API tests",
+        "current_value": "57/57 passed",
+        "display_value": "57/57 passed",
+        "sample_size": 57,
+        "measurement_source": "npm test:server, npm test:ml, npm test:evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "PASS",
+        "reason": "Test pass rate is distinct from coverage and model accuracy.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "98–100%",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "MEASURED"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Critical/high dependency vulnerabilities",
+        "current_value": "0",
+        "display_value": "0",
+        "sample_size": 2,
+        "measurement_source": "npm audit --audit-level=high and pip-audit -r ml-engine/requirements.txt",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "PASS",
+        "reason": "Pass means both CI audit commands completed successfully; it does not replace an independent application security audit.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "0",
+            "status": "MEETS"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "MEASURED"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Tenant isolation",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "One tenant-scoping API test exists; no comprehensive isolation audit report",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "A passing code test is not complete multi-tenant security verification.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "100%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Code coverage",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Coverage instrumentation not configured",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Pass rate is not code coverage.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "90% overall; 100% critical paths",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Data provenance completeness",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Supplied calibration file contains prediction and label only; no reviewer, evidence reference, or timestamp",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "The source rows cannot independently establish provenance.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "100% traceability",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Required-field completeness",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "No representative reviewed-label dataset available in the checked-in evidence",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Awaiting source-verified human-review records.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "≥99%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Duplicate verified records",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "No verified reviewed-label dataset available",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Duplicate checks require source-verified records.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "0",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Evaluation reproducibility",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Deterministic seed tests cover individual forecast logic, not full independent pipeline replay",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "A repeat evaluation against a versioned representative dataset has not been recorded.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "100% repeated-run agreement",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Model artifact version integrity",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "No production tenant model artifact available",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Requires a trained artifact tied to dataset and model versions.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "100% checksum verification",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "Forecast WAPE / interval coverage",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "Paired live forecast snapshots and actual outcomes",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "The supplied backtest CSV has no paired numeric actual/predicted outcomes.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "WAPE <15%; interval targets as specified",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      },
+      {
+        "name": "API p95 latency / availability",
+        "current_value": null,
+        "display_value": "NOT EVALUABLE",
+        "sample_size": 0,
+        "measurement_source": "No representative load test or monitoring window",
+        "dataset_version": null,
+        "model_version": null,
+        "evaluation_period": {
+          "start": null,
+          "end": null
+        },
+        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "status": "NOT EVALUABLE",
+        "reason": "Requires production telemetry.",
+        "tiers": [
+          {
+            "tier": "Target",
+            "target": "<500 ms / ≥99.5%",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Evidence",
+            "target": "Measured only",
+            "status": "NOT EVALUABLE"
+          },
+          {
+            "tier": "Scope",
+            "target": "See evidence note",
+            "status": "NOT EVALUABLE"
+          }
+        ]
+      }
+    ]
   },
   "metrics": [
     {
       "id": "tests",
       "name": "Unit, integration & API test pass rate",
-      "currentValue": "100.0% (53/53)",
+      "currentValue": "100.0% (57/57)",
       "target": "98–100%",
       "measurementSource": "npm test:server, npm test:ml, npm test:evidence",
-      "sampleSize": "53 executed cases across 3 test commands",
-      "lastEvaluatedAt": "2026-11-09T04:04:00.799Z",
+      "sampleSize": "57 executed cases across 3 test commands",
+      "lastEvaluatedAt": "2026-11-09T05:17:35.531Z",
       "status": "PASS",
       "note": "Counts are from the automated Node and Python test runners; they measure this test suite, not financial/model accuracy.",
       "originalValue": "41/41 tests (measured before this mission)",
@@ -37,7 +1389,7 @@
       "target": "≥90%",
       "measurementSource": "Coverage instrumentation is not configured",
       "sampleSize": "Not measured",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not measured",
@@ -63,7 +1415,7 @@
       "target": "100%",
       "measurementSource": "No multi-tenant identity/data boundary exists to validate",
       "sampleSize": "No tenant isolation suite",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not available",
@@ -76,7 +1428,7 @@
       "target": "100% of validated cases",
       "measurementSource": "Decimal ledger reconciliation: opening + credits − debits; sequence and transaction-ID checks",
       "sampleSize": "1 checked-in ledger fixture; 2 movements",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "PASS",
       "note": "This verifies one checked-in sandbox ledger only. It is not multicurrency or production financial correctness certification.",
       "originalValue": "Not measured",
@@ -85,15 +1437,28 @@
     {
       "id": "evidence-integrity",
       "name": "Evidence manifest integrity",
-      "currentValue": "4/4 files verified",
+      "currentValue": "5/5 files verified",
       "target": "100%",
       "measurementSource": "SHA-256 and byte-size checks against manifest.json",
-      "sampleSize": "4 manifest files",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "sampleSize": "5 manifest files",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "PASS",
       "note": "Integrity checks only; this does not establish that source data is representative or externally authentic",
       "originalValue": "Not recorded",
       "improvement": "First automated manifest hash/size report"
+    },
+    {
+      "id": "paypal-sandbox",
+      "name": "PayPal Sandbox Reporting integration",
+      "currentValue": "PASS; PASS; 1 transactions",
+      "target": "Balances and Transaction Search succeed",
+      "measurementSource": "PayPal Sandbox Reporting API; sanitized evidence/paypal_sandbox_verification.json",
+      "sampleSize": "1 returned in captured 30-day window",
+      "lastEvaluatedAt": "2026-11-09T04:44:24.006Z",
+      "status": "PASS",
+      "note": "PayPal account associated with these Sandbox app credentials; not arbitrary merchants",
+      "originalValue": "No prior measurement recorded",
+      "improvement": "No evidence-backed change recorded"
     },
     {
       "id": "forecast-wape",
@@ -102,7 +1467,7 @@
       "target": "<15%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable; generic Normal(78, 15) spend and 5% emergency assumptions",
@@ -115,7 +1480,7 @@
       "target": "within ±5%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable",
@@ -128,7 +1493,7 @@
       "target": "65–75%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable",
@@ -141,7 +1506,7 @@
       "target": "85–95%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable",
@@ -154,7 +1519,7 @@
       "target": "<0.05 on representative independent data",
       "measurementSource": "evidence/calibration_data.csv",
       "sampleSize": "646 labels; 0 positive",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "The supplied labels are not an independent representative calibration set; descriptive ECE is not target evidence",
       "originalValue": "0.200869 descriptive; 646 labels, 0 positive",
@@ -167,7 +1532,7 @@
       "target": ">0",
       "measurementSource": "evidence/calibration_data.csv; observed-prevalence baseline",
       "sampleSize": "646 labels; 0 positive",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "No positive labels are present, so the baseline is not meaningful for event prediction and skill is undefined",
       "originalValue": "Undefined; all-negative labels",
@@ -180,7 +1545,7 @@
       "target": "≥0.85",
       "measurementSource": "Independent labeled anomaly evaluation required",
       "sampleSize": "No independently labeled representative anomaly set",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluated",
@@ -193,7 +1558,7 @@
       "target": "<500 ms",
       "measurementSource": "Representative external load test required",
       "sampleSize": "No load-test sample",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not measured",
@@ -206,7 +1571,7 @@
       "target": "≥99.5%",
       "measurementSource": "Continuous uptime monitoring required",
       "sampleSize": "No monitoring window",
-      "lastEvaluatedAt": "2026-11-09T04:04:06.889Z",
+      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not measured",

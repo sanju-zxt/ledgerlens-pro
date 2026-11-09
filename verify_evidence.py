@@ -92,7 +92,7 @@ def check_manifest_hashes():
         raise AssertionError("manifest evidence anchor is not an ancestor of the current checkout")
     required = {
         "evidence/balance_logs.csv", "evidence/backtest.csv", "evidence/calibration_data.csv",
-        "evidence/paypal_api_responses/balance_response.json"
+        "evidence/paypal_api_responses/balance_response.json", "evidence/paypal_sandbox_verification.json"
     }
     files = manifest.get("files", {})
     if not required.issubset(files):
@@ -202,9 +202,28 @@ def check_paypal_fixture():
     print("PASS: PayPal balance response fixture has consistent currency fields")
 
 
+def check_paypal_sandbox_verification():
+    path = ROOT / "evidence/paypal_sandbox_verification.json"
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if report.get("schema_version") != 1 or report.get("environment") != "sandbox":
+        raise AssertionError("PayPal verification must identify the supported Sandbox check format")
+    if report.get("credential_values_recorded") is not False:
+        raise AssertionError("PayPal verification must not contain credential values")
+    if not report.get("captured_at") or not report.get("account_scope"):
+        raise AssertionError("PayPal verification needs capture time and account-scope disclosure")
+    checks = report.get("checks", {})
+    if checks.get("reporting_balances", {}).get("status") != "PASS" or checks.get("transaction_search", {}).get("status") != "PASS":
+        raise AssertionError("Both Sandbox Reporting API checks must succeed before recording this evidence")
+    forbidden = {"access_token", "client_secret", "client_id", "transaction_id", "description", "amount"}
+    if forbidden.intersection(key.lower() for key in checks):
+        raise AssertionError("PayPal verification must not contain private credentials or transaction details")
+    print("PASS: sanitized PayPal Sandbox Reporting verification is valid")
+
+
 if __name__ == "__main__":
     check_manifest_hashes()
     check_balance_ledger()
     check_backtest_metadata()
     check_calibration()
     check_paypal_fixture()
+    check_paypal_sandbox_verification()

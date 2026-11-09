@@ -33,4 +33,4 @@ npm run lint --workspace=server
 npm run lint --workspace=client
 ```
 
-The temporary synthetic rows in `ml-engine/test_quality_pipeline.py` are isolated test fixtures only. They are not checked in as evidence, do not enter the deployed model database, and do not contribute to product scorecards. `python -m unittest discover -p test_*.py -v` from `ml-engine` exercises data provenance, tenant scoping, chronological model fitting/artifact persistence, insufficiency gates, and forecast outcome matching.
+The temporary rows in `ml-engine/test_quality_pipeline.py` are isolated fixtures only. The separate `ml-engine/synthetic_benchmark.py` is a reproducible controlled benchmark with injected patterns; its report is clearly marked synthetic and is never used as PayPal/customer performance evidence. Neither enters the deployed reviewed-label database. `python -m unittest discover -p test_*.py -v` from `ml-engine` exercises data provenance, tenant-key scoping, chronological model fitting/artifact persistence, insufficiency gates, forecast outcome matching, and synthetic benchmark separation.

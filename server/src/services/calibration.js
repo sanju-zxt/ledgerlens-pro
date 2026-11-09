@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const calibrationPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../evidence/calibration_data.csv");
@@ -31,6 +32,11 @@ export function calculateCalibration(observations, binCount = 10) {
   const n = observations.length;
   const positiveRate = observations.reduce((sum, item) => sum + item.label, 0) / n;
   const brierScore = observations.reduce((sum, item) => sum + (item.prediction - item.label) ** 2, 0) / n;
+  const epsilon = Number.EPSILON;
+  const logLoss = -observations.reduce((sum, item) => {
+    const probability = Math.min(1 - epsilon, Math.max(epsilon, item.prediction));
+    return sum + item.label * Math.log(probability) + (1 - item.label) * Math.log(1 - probability);
+  }, 0) / n;
   const baselineBrierScore = observations.reduce((sum, item) => sum + (positiveRate - item.label) ** 2, 0) / n;
   const positiveCount = observations.reduce((sum, item) => sum + item.label, 0);
   const negativeCount = n - positiveCount;
@@ -94,6 +100,7 @@ export function calculateCalibration(observations, binCount = 10) {
 
   return {
     brier_score: brierScore,
+    log_loss: logLoss,
     baseline_brier_score: baselineBrierScore,
     brier_skill_score: baselineBrierScore > 0 ? 1 - brierScore / baselineBrierScore : null,
     expected_calibration_error: expectedCalibrationError,
@@ -122,5 +129,12 @@ export function calculateCalibration(observations, binCount = 10) {
 }
 
 export function readCalibrationEvidence() {
-  return calculateCalibration(parseCalibrationCsv(fs.readFileSync(calibrationPath, "utf8")));
+  const contents = fs.readFileSync(calibrationPath, "utf8");
+  return {
+    ...calculateCalibration(parseCalibrationCsv(contents)),
+    dataset_version: createHash("sha256").update(contents).digest("hex"),
+    evaluation_period: { start: null, end: null, reason: "Source file has no observation timestamp" },
+    model_version: null,
+    last_evaluated_at: new Date().toISOString()
+  };
 }

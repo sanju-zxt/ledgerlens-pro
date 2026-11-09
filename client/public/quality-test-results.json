@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T04:04:00.799Z",
+  "generatedAt": "2026-11-09T05:18:45.306Z",
   "source": "npm test:server, npm test:ml, npm test:evidence",
   "suites": [
     {
@@ -12,7 +12,7 @@
     {
       "suite": "test:ml",
       "commandPassed": true,
-      "observedCases": 19,
+      "observedCases": 23,
       "parsedCaseCount": true,
       "failures": 0
     },
@@ -24,8 +24,8 @@
       "failures": 0
     }
   ],
-  "totalCases": 53,
-  "passedCases": 53,
+  "totalCases": 57,
+  "passedCases": 57,
   "failedCases": 0,
   "passRate": 1,
   "status": "PASS"

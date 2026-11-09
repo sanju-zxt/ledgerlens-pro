@@ -20,7 +20,7 @@ import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import brier_score_loss, log_loss, precision_recall_fscore_support
+from sklearn.metrics import brier_score_loss, log_loss, precision_recall_fscore_support, roc_auc_score, average_precision_score
 from sklearn.pipeline import make_pipeline
 from sklearn.isotonic import IsotonicRegression
 from sklearn.preprocessing import StandardScaler
@@ -43,6 +43,9 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript("""
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS labels (
         id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, transaction_id TEXT NOT NULL,
         transaction_hash TEXT NOT NULL, event_time TEXT NOT NULL, amount REAL,
@@ -71,6 +74,18 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
         rationale TEXT NOT NULL, evidence_ref TEXT NOT NULL, reviewer TEXT NOT NULL,
         reviewed_at TEXT NOT NULL, revision INTEGER NOT NULL, previous_event_id TEXT
       );
+      CREATE TABLE IF NOT EXISTS review_triage (
+        tenant_id TEXT NOT NULL, transaction_id TEXT NOT NULL, transaction_hash TEXT NOT NULL,
+        transaction_json TEXT NOT NULL, status TEXT NOT NULL CHECK(status='needs_investigation'),
+        rationale TEXT NOT NULL, reviewer TEXT NOT NULL, reviewed_at TEXT NOT NULL,
+        revision INTEGER NOT NULL, PRIMARY KEY(tenant_id, transaction_id)
+      );
+      CREATE TABLE IF NOT EXISTS review_triage_history (
+        event_id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, transaction_id TEXT NOT NULL,
+        transaction_hash TEXT NOT NULL, status TEXT NOT NULL CHECK(status='needs_investigation'),
+        rationale TEXT NOT NULL, reviewer TEXT NOT NULL, reviewed_at TEXT NOT NULL,
+        revision INTEGER NOT NULL, previous_event_id TEXT
+      );
       CREATE TABLE IF NOT EXISTS experiments (
         id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, created_at TEXT NOT NULL, dataset_version TEXT NOT NULL,
         model_version TEXT NOT NULL, report TEXT NOT NULL
@@ -79,6 +94,8 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     experiment_columns = {row["name"] for row in db.execute("PRAGMA table_info(experiments)")}
     if "tenant_id" not in experiment_columns:
         db.execute("ALTER TABLE experiments ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''")
+    db.execute("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(1, ?)", (utcnow(),))
+    db.execute("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, ?)", (utcnow(),))
     return db
 
 
@@ -141,12 +158,42 @@ def add_label(payload: dict[str, Any], *, tenant: str, reviewer: str, path: str 
           label=excluded.label,rationale=excluded.rationale,evidence_ref=excluded.evidence_ref,
           reviewer=excluded.reviewer,reviewed_at=excluded.reviewed_at""",
           (row_id, tenant, txid, digest, date, amount, currency, category, description, int(label), rationale, evidence_ref, reviewer[:200], reviewed))
+        # A human-confirmed expected/unusual outcome resolves the current triage
+        # item. The immutable triage event remains in review_triage_history.
+        db.execute("DELETE FROM review_triage WHERE tenant_id=? AND transaction_id=?", (tenant, txid))
     return {"transaction_id": txid, "label": int(label), "reviewer": reviewer, "reviewed_at": reviewed, "evidence_ref": evidence_ref, "revision": revision, "history_event_id": event_id}
 
 
 def label_history(tenant: str, path: str | Path | None = None) -> list[dict]:
     with db_session(path) as db:
         return [dict(row) for row in db.execute("SELECT * FROM label_history WHERE tenant_id=? ORDER BY reviewed_at DESC", (tenant,))]
+
+
+def triage_history(tenant: str, path: str | Path | None = None) -> list[dict]:
+    with db_session(path) as db:
+        return [dict(row) for row in db.execute("SELECT * FROM review_triage_history WHERE tenant_id=? ORDER BY reviewed_at DESC", (tenant,))]
+
+
+def mark_needs_investigation(payload: dict[str, Any], *, tenant: str, reviewer: str, path: str | Path | None = None) -> dict:
+    """Persist an uncertainty decision separately; it never enters model labels."""
+    txid, date, amount, currency, category, description, digest = clean_tx(payload["transaction"])
+    rationale = str(payload.get("rationale") or "").strip()
+    if payload.get("status") != "needs_investigation" or len(rationale) < 12 or len(rationale) > 2000:
+        raise ValueError("Needs-investigation status requires a rationale of 12 to 2000 characters")
+    transaction = payload["transaction"]
+    reviewed = utcnow()
+    transaction_json = json.dumps({"id": transaction.get("id"), "date": date, "amount": amount, "currency": currency, "category": category, "description": description, "status": transaction.get("status"), "source": transaction.get("source")}, sort_keys=True)
+    with db_session(path) as db:
+        previous = db.execute("SELECT event_id FROM review_triage_history WHERE tenant_id=? AND transaction_id=? ORDER BY revision DESC LIMIT 1", (tenant, txid)).fetchone()
+        revision = db.execute("SELECT COALESCE(MAX(revision),0)+1 FROM review_triage_history WHERE tenant_id=? AND transaction_id=?", (tenant, txid)).fetchone()[0]
+        event_id = hashlib.sha256(f"{tenant}:{txid}:{reviewed}:{revision}".encode()).hexdigest()
+        db.execute("INSERT INTO review_triage_history VALUES(?,?,?,?,?,?,?,?,?,?)", (event_id, tenant, txid, digest, "needs_investigation", rationale, reviewer[:200], reviewed, revision, previous["event_id"] if previous else None))
+        db.execute("""INSERT INTO review_triage VALUES(?,?,?,?,?,?,?,?,?)
+          ON CONFLICT(tenant_id, transaction_id) DO UPDATE SET transaction_hash=excluded.transaction_hash,
+          transaction_json=excluded.transaction_json,status=excluded.status,rationale=excluded.rationale,
+          reviewer=excluded.reviewer,reviewed_at=excluded.reviewed_at,revision=excluded.revision""",
+          (tenant, txid, digest, transaction_json, "needs_investigation", rationale, reviewer[:200], reviewed, revision))
+    return {"transaction_id": txid, "status": "needs_investigation", "reviewer": reviewer, "reviewed_at": reviewed, "evidence_ref": f"sha256:{digest}", "revision": revision, "history_event_id": event_id, "included_in_training": False}
 
 
 def _rows(db: sqlite3.Connection, tenant: str) -> list[dict]:
@@ -275,7 +322,9 @@ def experiment(tenant: str, path: str | Path | None = None) -> dict:
     joblib.dump({"pipeline": selected_model, "calibration": selected_calibration, "calibration_method": best["calibration"], "model_name": best["model"], "model_version": best_version, "dataset_version": quality["dataset_version"], "feature_schema": "prior-only category amount baseline; hashed category/currency; cyclical timestamp v1"}, temporary_path)
     temporary_path.replace(artifact_path)
     evaluated_at = utcnow()
-    test_metrics = {"sample_size": int(n - c), "evaluation_period": {"start": rows[c]["event_time"], "end": rows[-1]["event_time"]}, "last_evaluated_at": evaluated_at, "model_version": best_version, "dataset_version": quality["dataset_version"], "precision": float(precision), "recall": float(recall), "f1": float(f1), "brier": brier(y[c:], test_prob), "brier_skill_vs_training_prevalence": float(1 - brier(y[c:], test_prob) / brier(y[c:], baseline_probs)) if brier(y[c:], baseline_probs) > 0 else None, "baseline_brier": brier(y[c:], baseline_probs), "log_loss": float(log_loss(y[c:], np.c_[1 - test_prob, test_prob], labels=[0, 1])), "ece_equal_width_10": ece_score(y[c:], test_prob)}
+    model_brier = brier(y[c:], test_prob); baseline_brier = brier(y[c:], baseline_probs)
+    model_log_loss = float(log_loss(y[c:], np.c_[1 - test_prob, test_prob], labels=[0, 1])); baseline_log_loss = float(log_loss(y[c:], np.c_[1 - baseline_probs, baseline_probs], labels=[0, 1]))
+    test_metrics = {"sample_size": int(n - c), "evaluation_period": {"start": rows[c]["event_time"], "end": rows[-1]["event_time"]}, "last_evaluated_at": evaluated_at, "model_version": best_version, "dataset_version": quality["dataset_version"], "precision": float(precision), "recall": float(recall), "f1": float(f1), "roc_auc": float(roc_auc_score(y[c:], test_prob)) if len(np.unique(y[c:])) == 2 else None, "pr_auc": float(average_precision_score(y[c:], test_prob)) if len(np.unique(y[c:])) == 2 else None, "brier": model_brier, "brier_skill_vs_training_prevalence": float(1 - model_brier / baseline_brier) if baseline_brier > 0 else None, "baseline_brier": baseline_brier, "log_loss": model_log_loss, "baseline_log_loss": baseline_log_loss, "log_loss_skill_vs_training_prevalence": float(1 - model_log_loss / baseline_log_loss) if baseline_log_loss > 0 else None, "ece_equal_width_10": ece_score(y[c:], test_prob)}
     report = {"status": "EVALUATED", "created_at": evaluated_at, "evaluation_period": {"train_start": rows[0]["event_time"], "train_end": rows[a-1]["event_time"], "calibration_start": rows[a]["event_time"], "calibration_end": rows[b-1]["event_time"], "validation_start": rows[b]["event_time"], "validation_end": rows[c-1]["event_time"], "test_start": rows[c]["event_time"], "test_end": rows[-1]["event_time"]},
               "dataset": quality, "model_version": best_version, "model_artifact": artifact_name, "selected_on": "validation Brier, then validation log loss; test set untouched during selection", "split": {"method": "chronological 55/15/15/15: train/calibration/validation/test", "train_n": a, "calibration_n": b-a, "validation_n": c-b, "test_n": n-c}, "training_parameters": {"logistic-regression": {"class_weight": "balanced", "max_iter": 1000, "random_state": 42, "preprocessing": "training-fit median imputation and standard scaling"}, "hist-gradient-boosting": {"max_iter": 100, "learning_rate": 0.08, "l2_regularization": 1.0, "random_state": 42, "preprocessing": "training-fit median imputation"}, "feature_schema": "prior-only 30-day category amount baseline; log amount; prior count; hashed category/currency; cyclical timestamp"}, "validation_candidates": validation_results, "best_model": best, "test_metrics": test_metrics, "baseline": {"name": "training-period prevalence probability", "probability": baseline_probability, "test_brier": test_metrics["baseline_brier"]}, "calibration_methods": {"platt": "LogisticRegression C=1e6 fitted only on the chronological calibration period", "isotonic": "fit only when calibration split has at least 100 samples and 20 examples per class"}, "limitation": "Metrics describe this tenant's reviewed labels and do not establish generalization to other tenants or populations."}
     experiment_id = hashlib.sha256(f"{tenant}:{report['model_version']}".encode()).hexdigest()
@@ -365,12 +414,13 @@ def forecast_report(tenant: str, path: str | Path | None = None) -> dict:
         if len(sample) < 30:
             results.append({"horizon_days": horizon, "sample_size": len(sample), "evaluation_period": {"start": sample[0]["as_of"] if sample else None, "end": sample[-1]["as_of"] if sample else None}, "dataset_version": hashlib.sha256("".join(r["id"] for r in sample).encode()).hexdigest()[:16] if sample else None, "model_versions": sorted({r["model_version"] for r in sample}), "last_evaluated_at": evaluated_at, "status": "NOT EVALUABLE", "reason": "At least 30 chronologically matched forecast snapshots are required per horizon; repeated forecasts are correlated and not independent merchant samples."})
             continue
-        actual = np.asarray([r["actual_balance"] for r in sample]); pred = np.asarray([next((float(p["median"]) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); lower = np.asarray([next((float(p["lower_bound"]) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); upper = np.asarray([next((float(p["upper_bound"]) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); lower90 = np.asarray([next((float(p.get("lower_bound_90", np.nan)) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); upper90 = np.asarray([next((float(p.get("upper_bound_90", np.nan)) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); naive = np.asarray([r["current_balance"] for r in sample]); denom = np.sum(np.abs(actual))
+        actual = np.asarray([r["actual_balance"] for r in sample]); pred = np.asarray([next((float(p["median"]) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); lower = np.asarray([next((float(p["lower_bound"]) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); upper = np.asarray([next((float(p["upper_bound"]) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); lower90 = np.asarray([next((float(p.get("lower_bound_90", np.nan)) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); upper90 = np.asarray([next((float(p.get("upper_bound_90", np.nan)) for p in json.loads(r["predictions"]) if int(p["day"]) == horizon), np.nan) for r in sample]); naive = np.asarray([r["current_balance"] for r in sample]); denom = np.sum(np.abs(actual)); typical_balance = float(np.median(np.abs(actual)))
         wape = float(np.sum(np.abs(pred-actual))/denom) if denom else None
         bias = float(np.sum(pred-actual)/denom) if denom else None
         coverage70 = float(np.mean((actual>=lower)&(actual<=upper)))
         coverage90 = float(np.mean((actual>=lower90)&(actual<=upper90))) if np.isfinite(lower90).all() and np.isfinite(upper90).all() else None
-        results.append({"horizon_days": horizon, "sample_size": len(sample), "evaluation_period": {"start": sample[0]["as_of"], "end": sample[-1]["as_of"]}, "dataset_version": hashlib.sha256("".join(r["id"] for r in sample).encode()).hexdigest()[:16], "model_versions": sorted({r["model_version"] for r in sample}), "last_evaluated_at": evaluated_at, "mae": float(np.mean(np.abs(pred-actual))), "rmse": float(np.sqrt(np.mean((pred-actual)**2))), "wape": wape, "bias": bias, "prediction_interval_coverage": {"70_percent": coverage70, "90_percent": coverage90}, "target_status": {"wape_below_15_percent": "NOT EVALUABLE" if wape is None else "PASS" if wape < .15 else "FAIL", "bias_within_5_percent": "NOT EVALUABLE" if bias is None else "PASS" if abs(bias) <= .05 else "FAIL", "70_percent_interval_coverage_65_to_75": "PASS" if .65 <= coverage70 <= .75 else "FAIL", "90_percent_interval_coverage_85_to_95": "NOT EVALUABLE" if coverage90 is None else "PASS" if .85 <= coverage90 <= .95 else "FAIL"}, "naive_baseline_mae": float(np.mean(np.abs(naive-actual))), "status": "EVALUATED", "interpretation": "Within-tenant chronological monitoring only; overlapping windows are correlated and do not establish cross-merchant generalization."})
+        mae = float(np.mean(np.abs(pred-actual))); rmse = float(np.sqrt(np.mean((pred-actual)**2))); naive_mae = float(np.mean(np.abs(naive-actual))); naive_rmse = float(np.sqrt(np.mean((naive-actual)**2)))
+        results.append({"horizon_days": horizon, "sample_size": len(sample), "evaluation_period": {"start": sample[0]["as_of"], "end": sample[-1]["as_of"]}, "dataset_version": hashlib.sha256("".join(r["id"] for r in sample).encode()).hexdigest()[:16], "model_versions": sorted({r["model_version"] for r in sample}), "last_evaluated_at": evaluated_at, "typical_balance": typical_balance, "mae": mae, "normalized_mae": mae / typical_balance if typical_balance else None, "rmse": rmse, "normalized_rmse": rmse / typical_balance if typical_balance else None, "wape": wape, "bias": bias, "absolute_bias": abs(bias) if bias is not None else None, "prediction_interval_coverage": {"70_percent": coverage70, "90_percent": coverage90}, "target_status": {"wape_below_15_percent": "NOT EVALUABLE" if wape is None else "PASS" if wape < .15 else "FAIL", "normalized_mae_below_10_percent": "NOT EVALUABLE" if not typical_balance else "PASS" if mae / typical_balance <= .10 else "FAIL", "normalized_rmse_below_20_percent": "NOT EVALUABLE" if not typical_balance else "PASS" if rmse / typical_balance <= .20 else "FAIL", "absolute_bias_within_5_percent": "NOT EVALUABLE" if bias is None else "PASS" if abs(bias) <= .05 else "FAIL", "70_percent_interval_coverage_65_to_75": "PASS" if .65 <= coverage70 <= .75 else "FAIL", "90_percent_interval_coverage_85_to_95": "NOT EVALUABLE" if coverage90 is None else "PASS" if .85 <= coverage90 <= .95 else "FAIL"}, "naive_baseline_mae": naive_mae, "naive_baseline_rmse": naive_rmse, "mae_improvement_vs_baseline": 1 - mae / naive_mae if naive_mae else None, "rmse_improvement_vs_baseline": 1 - rmse / naive_rmse if naive_rmse else None, "status": "EVALUATED", "interpretation": "Within-tenant chronological monitoring only; overlapping windows are correlated and do not establish cross-merchant generalization."})
     return {"generated_at": evaluated_at, "method": "chronological forecast issue-time snapshots matched to observed balances within ±1 day of target; no future feature reuse", "results": results}
 
 

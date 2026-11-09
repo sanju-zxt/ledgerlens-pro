@@ -11,7 +11,7 @@ test("health endpoint is available without exposing account data", async () => {
 });
 
 test("forecast, ledger, PayPal, dashboard, and model-quality routes require a valid session", async () => {
-  for (const path of ["/api/forecast", "/api/transactions", "/api/paypal/status", "/api/dashboard/summary", "/api/evidence/manifest", "/api/analysis/pipeline", "/api/analysis/experiment", "/api/analysis/forecast-report", "/api/analysis/evaluation-report"]) {
+  for (const path of ["/api/forecast", "/api/transactions", "/api/paypal/status", "/api/paypal/verification", "/api/dashboard/summary", "/api/evidence/manifest", "/api/analysis/pipeline", "/api/analysis/experiment", "/api/analysis/forecast-report", "/api/analysis/evaluation-report"]) {
     const response = await request(app).get(path);
     assert.equal(response.status, 401, `${path} should require a valid session`);
   }
@@ -41,6 +41,7 @@ test("configured login and explicit sandbox demo session expose only their suppo
     const demoAgent = request.agent(app);
     const demoLogin = await demoAgent.post("/api/auth/demo").send({});
     assert.equal(demoLogin.status, 200);
+    await demoAgent.get("/api/paypal/verification").expect(403);
     await demoAgent.post("/api/analysis/labels").send({ transaction_key: "browser-invented-id|0|", source: "SANDBOX_EVIDENCE", label: 1, rationale: "A test rationale with sufficient length" }).expect(404);
     const forecast = await demoAgent.get("/api/forecast");
     assert.equal(forecast.status, 200);
@@ -57,6 +58,10 @@ test("configured login and explicit sandbox demo session expose only their suppo
     const reconciliation = await demoAgent.get("/api/transactions/reconciliation");
     assert.equal(reconciliation.body.calculated_closing_balance, "6982.56");
     assert.equal(reconciliation.body.reconciled, true);
+    const searched = await demoAgent.get("/api/transactions?q=credit&status=COMPLETED&currency=USD&sort=amount_desc");
+    assert.equal(searched.body.total, 1);
+    assert.match(searched.body.data[0].description, /credit/i);
+    await demoAgent.get("/api/transactions?currency=not-a-code").expect(400);
     await demoAgent.post("/api/auth/logout").send({}).expect(204);
     await demoAgent.get("/api/transactions").expect(401);
   } finally {

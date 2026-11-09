@@ -6,7 +6,8 @@ const files = [
   "evidence/balance_logs.csv",
   "evidence/backtest.csv",
   "evidence/calibration_data.csv",
-  "evidence/paypal_api_responses/balance_response.json"
+  "evidence/paypal_api_responses/balance_response.json",
+  "evidence/paypal_sandbox_verification.json"
 ];
 const manifest = {
   git: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),

@@ -17,11 +17,13 @@ test("forecast, ledger, PayPal, and dashboard routes require a valid session", a
   }
 });
 
-test("configured login provides access to the evidence ledger", async () => {
-  const old = { JWT_SECRET: process.env.JWT_SECRET, DEMO_EMAIL: process.env.DEMO_EMAIL, DEMO_PASSWORD_HASH: process.env.DEMO_PASSWORD_HASH };
+test("configured login and explicit sandbox demo session expose only their supported data", async () => {
+  const old = { JWT_SECRET: process.env.JWT_SECRET, DEMO_EMAIL: process.env.DEMO_EMAIL, DEMO_PASSWORD_HASH: process.env.DEMO_PASSWORD_HASH, DEMO_MODE_ENABLED: process.env.DEMO_MODE_ENABLED, PAYPAL_ENV: process.env.PAYPAL_ENV };
   process.env.JWT_SECRET = "test-only-secret-long-enough-for-authentication";
   process.env.DEMO_EMAIL = "merchant@example.test";
   process.env.DEMO_PASSWORD_HASH = bcrypt.hashSync("test-password", 4);
+    process.env.DEMO_MODE_ENABLED = "true";
+    process.env.PAYPAL_ENV = "sandbox";
   try {
     const agent = request.agent(app);
     const login = await agent.post("/api/auth/login").send({ email: "merchant@example.test", password: "test-password" });
@@ -33,23 +35,27 @@ test("configured login provides access to the evidence ledger", async () => {
     assert.equal(ledger.body.total, 2);
     assert.equal(ledger.body.data.length, 1);
     assert.equal(ledger.body.source, "SANDBOX_EVIDENCE");
-    const forecast = await agent.get("/api/forecast");
+    await agent.post("/api/auth/logout").expect(204);
+    const demoAgent = request.agent(app);
+    const demoLogin = await demoAgent.post("/api/auth/demo").send({});
+    assert.equal(demoLogin.status, 200);
+    const forecast = await demoAgent.get("/api/forecast");
     assert.equal(forecast.status, 200);
     assert.equal(forecast.body.forecast_status, "insufficient_history");
     assert.equal(forecast.body.ending_balance, undefined);
     assert.match(forecast.body.history_profile.reason, /Need at least 10 completed debit transactions/);
-    const scenario = await agent.post("/api/forecast/simulate").send({});
+    const scenario = await demoAgent.post("/api/forecast/simulate").send({});
     assert.equal(scenario.status, 400);
     assert.match(scenario.body.message, /enter an explicit daily operating-expense assumption/i);
-    const hypothetical = await agent.post("/api/forecast/simulate").send({ daily_expense_mean: 50, daily_expense_std: 0 });
+    const hypothetical = await demoAgent.post("/api/forecast/simulate").send({ daily_expense_mean: 50, daily_expense_std: 0 });
     assert.equal(hypothetical.status, 200);
     assert.equal(hypothetical.body.forecast_status, "scenario");
     assert.equal(hypothetical.body.scenario_applied.expense_assumption_source, "USER_ENTERED_HYPOTHETICAL");
-    const reconciliation = await agent.get("/api/transactions/reconciliation");
+    const reconciliation = await demoAgent.get("/api/transactions/reconciliation");
     assert.equal(reconciliation.body.calculated_closing_balance, "6982.56");
     assert.equal(reconciliation.body.reconciled, true);
-    await agent.post("/api/auth/logout").send({}).expect(204);
-    await agent.get("/api/transactions").expect(401);
+    await demoAgent.post("/api/auth/logout").send({}).expect(204);
+    await demoAgent.get("/api/transactions").expect(401);
   } finally {
     for (const [key, value] of Object.entries(old)) value === undefined ? delete process.env[key] : process.env[key] = value;
   }

@@ -17,9 +17,10 @@ for (const suite of suites) {
   const run = spawnSync(command, args, { cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 })
   const output = `${run.stdout || ""}${run.stderr || ""}`
   process.stdout.write(output)
-  const nodeTests = output.match(/ℹ tests\s+(\d+)/)
-  const nodePass = output.match(/ℹ pass\s+(\d+)/)
-  const nodeFail = output.match(/ℹ fail\s+(\d+)/)
+  // Node's default reporter is TAP under CI, while local runs may use spec output.
+  const nodeTests = output.match(/(?:ℹ\s+tests|#\s*tests)\s+(\d+)/)
+  const nodePass = output.match(/(?:ℹ\s+pass|#\s*pass)\s+(\d+)/)
+  const nodeFail = output.match(/(?:ℹ\s+fail|#\s*fail)\s+(\d+)/)
   const pythonTests = [...output.matchAll(/Ran\s+(\d+)\s+tests?/g)].reduce((sum, match) => sum + Number(match[1]), 0)
   const count = Number(nodeTests?.[1] || 0) + pythonTests
   const failures = nodeFail ? Number(nodeFail[1]) : run.status === 0 ? 0 : null

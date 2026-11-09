@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-11-09T03:15:30.745Z",
+  "source": "npm audit --audit-level=high and pip-audit -r ml-engine/requirements.txt",
+  "scans": [
+    "npm dependencies (including development dependencies)",
+    "Python dependencies in ml-engine/requirements.txt"
+  ],
+  "knownCriticalOrHighVulnerabilities": 0,
+  "status": "PASS",
+  "note": "Pass means both CI audit commands completed successfully; it does not replace an independent application security audit."
+}

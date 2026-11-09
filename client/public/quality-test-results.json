@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-11-09T03:13:21.473Z",
+  "source": "npm test:server, npm test:ml, npm test:evidence",
+  "suites": [
+    {
+      "suite": "test:server",
+      "commandPassed": true,
+      "observedCases": 27,
+      "parsedCaseCount": true,
+      "failures": 0
+    },
+    {
+      "suite": "test:ml",
+      "commandPassed": true,
+      "observedCases": 13,
+      "parsedCaseCount": true,
+      "failures": 0
+    },
+    {
+      "suite": "test:evidence",
+      "commandPassed": true,
+      "observedCases": 7,
+      "parsedCaseCount": true,
+      "failures": 0
+    }
+  ],
+  "totalCases": 47,
+  "passedCases": 47,
+  "failedCases": 0,
+  "passRate": 1,
+  "status": "PASS"
+}

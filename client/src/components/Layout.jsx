@@ -10,6 +10,7 @@ const navItems = [
   { path: "/anomalies", label: "Anomaly review", icon: "anomaly" },
   { path: "/insights", label: "Financial insights", icon: "insights" },
   { path: "/model-quality", label: "Model quality", icon: "quality" },
+  { path: "/quality", label: "Engineering scorecard", icon: "quality" },
   { path: "/updates", label: "Updates & guide", icon: "updates" },
   { path: "/settings", label: "Settings & sources", icon: "settings" }
 ]

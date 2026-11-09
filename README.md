@@ -7,11 +7,11 @@
 - The included balance ledger is a small **sandbox evidence fixture**, dated October 15, 2026. It is not a connected merchant account.
 - The example sequence reconciles independently: $3,500.00 opening + $3,500.00 credit − $17.44 debit = $6,982.56. The evidence calls the debit a movement; it does not prove that it is a PayPal fee.
 - The captured PayPal balance response is a distinct snapshot showing $3,500.00 total, $3,482.56 available, and $17.44 withheld. It is not added to the ledger movements.
-- Forecasts are simulations. Baseline future income is zero; optional scenario receipts are explicitly hypothetical. Expense and emergency distributions are generic assumptions, not learned from a merchant's ledger.
+- Forecasts are simulations. Baseline future income and emergencies are zero; recent completed debits are bootstrapped empirically only when the 30-day history has at least 10 debits across 5 spend days. Sparse history suppresses the personal forecast instead of substituting generic spend assumptions. Scenario receipts and manually entered costs are explicitly hypothetical.
 - Backtest metadata contains 12 consecutive windows. Its referenced raw outcome files are absent, so results cannot be independently reproduced or used to substantiate performance claims.
 - Calibration data has 646 rows. `python verify_evidence.py` calculates the checked-in set’s metrics; do not substitute the unverified metrics quoted in prior notes.
 - The calibration labels in the checked-in file are all negative. The UI computes Brier, prevalence baseline, equal-width ECE, reliability bins, and class metrics where defined; the zero-prevalence baseline Brier is zero, so Brier skill and positive-event performance cannot be validated on this file.
-- The workspace includes a collapsible navigation menu, a model-quality page, and a build-update page. These show checked-in evidence, current configuration state, or actual shipped feature notes; they do not invent merchant activity or live PayPal connection status.
+- The workspace includes a collapsible navigation menu, model-quality and engineering-scorecard pages, and a build-update page. The scorecard records targets, measured values, evidence sources, sample sizes, evaluation times, and status; unavailable metrics stay NOT EVALUABLE.
 
 ## Architecture
 
@@ -22,7 +22,7 @@
 | ML service | FastAPI, NumPy PCG64, scikit-learn Isolation Forest | 8001 |
 | Evidence | Read-only CSV/JSON fixtures and SHA-256 manifest | — |
 
-The Express API's seeded JavaScript Monte Carlo engine is the authoritative forecast used by the dashboard and scenario simulator. The FastAPI forecast endpoint remains an independent reference implementation and is not consumed by the web application; cross-engine bit-for-bit parity is not claimed. The same service provides multi-feature batch anomaly review and calibration calculations. Configured PayPal credentials can load Reporting balances and Transaction Search for the account associated with that app. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented; this is not yet a multi-merchant SaaS product.
+The Express API's seeded JavaScript Monte Carlo engine is the authoritative forecast used by the dashboard and scenario simulator. The baseline resamples observed UTC daily debit totals and excludes refunds, reversals, pending activity, and other currencies. The FastAPI forecast endpoint remains an independent reference implementation and is not consumed by the web application; cross-engine bit-for-bit parity is not claimed. The ML service provides batch Isolation Forest review using robust amount deviation, prior-only peer frequency, transaction velocity and time features. Precision, recall, F1, ECE targets, and forecast accuracy remain unverified without independent representative labels and paired forecast outcomes. Configured PayPal credentials can load Reporting balances and Transaction Search for the account associated with that app. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented; this is not yet a multi-merchant SaaS product.
 
 ## Setup
 
@@ -68,8 +68,8 @@ Protected API routes use a short-lived HttpOnly session cookie in the web client
 | GET | `/api/auth/me` | Validate current session |
 | GET | `/api/transactions?limit=50&page=1` | Sandbox evidence; `source=paypal` requests live Transaction Search |
 | GET | `/api/transactions/reconciliation` | Decimal-based fixture reconciliation |
-| GET | `/api/forecast` | Deterministic 30-day Monte Carlo forecast, including separate any-day/ending reserve risks and Wilson intervals |
-| POST | `/api/forecast/simulate` | Run an illustrative income-delay/emergency/savings scenario |
+| GET | `/api/forecast` | 30-day empirical-bootstrap simulation when recent debit history meets the stated minimum; otherwise returns insufficient-history status without forecast metrics |
+| POST | `/api/forecast/simulate` | Run a clearly hypothetical receipt/cost scenario; an explicit daily-spend input is required when history is insufficient |
 | GET | `/api/analysis/calibration` | Calculate calibration metrics from checked-in labeled rows |
 | GET | `/api/paypal/status` | Credential configuration status |
 | GET | `/api/paypal/balances` | PayPal Reporting balance snapshot, with retrieval provenance |
@@ -94,6 +94,8 @@ npm run validate
 ```
 
 `verify_evidence.py` checks evidence manifest hashes/sizes, sequence and balance reconciliation, backtest metadata schema/window continuity, calibration values and class distribution, and balance fixture currency consistency. It reports missing raw backtest files and undocumented timestamp semantics; metadata validation is not independent validation of forecast outcomes. If a raw backtest file is supplied, it must match the documented forecast outcome schema and pass duplicate, date, finite-value, interval-order and currency checks.
+
+`npm test` writes case-level results to `client/public/quality-test-results.json`. `npm run quality:report` generates `client/public/quality-scorecard.json`; the root production build runs this report automatically. CI runs dependency audits and uploads the scorecard, test summary and audit result as a build artifact. Coverage, tenant isolation, forecast accuracy, calibration quality and service-level metrics remain NOT EVALUABLE until their measurement systems and representative datasets exist.
 
 `npm run manifest` calculates SHA-256 and byte sizes directly from the four checked-in evidence files and records the current Git commit as its provenance anchor. It does not alter evidence. `npm run validate` verifies that anchor is in the current history, checks the manifest hashes/sizes, and runs semantic checks. Regenerate the manifest after changing evidence files.
 

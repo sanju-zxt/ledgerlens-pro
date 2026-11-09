@@ -7,6 +7,17 @@ test("Monte Carlo output is deterministic for a fixed seed", () => {
   assert.deepEqual(forecastCashflow(options), forecastCashflow(options));
 });
 
+test("empirical daily spending bootstrap preserves observed zero-spend mass", () => {
+  const sample = [0, 0, 0, 20];
+  const options = { currentBalance: 1000, dailyExpenseSamples: sample, simulations: 1000, horizon: 10, seed: 13, emergencyProbability: 0 };
+  const first = forecastCashflow(options);
+  const second = forecastCashflow(options);
+  assert.deepEqual(first, second);
+  assert.equal(first.provenance.assumptions.dailyExpenseDistribution, "Empirical bootstrap with replacement");
+  assert.equal(first.provenance.assumptions.dailyExpenseSamples, "4 observed daily samples");
+  assert.ok(first.ending_balance.median <= 1000);
+});
+
 test("path breach probability and ending-below-reserve probability are distinct", () => {
   const result = forecastCashflow({ currentBalance: 1001, dailyExpenseMean: 1, dailyExpenseStd: 0, paymentAmount: 5000, emergencyProbability: 0, simulations: 100 });
   assert.equal(result.reserve_breach_probability, 1);

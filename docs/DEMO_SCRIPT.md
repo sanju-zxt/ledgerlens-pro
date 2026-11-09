@@ -10,7 +10,7 @@ If Sandbox Reporting is working, use the configured workspace and show the PayPa
 
 ## 0:20–0:55 — Financial overview
 
-Show the balance source and currency, median 30-day balance, reserve runway, and reserve-dip probability. Say: “The starting balance comes from the labeled evidence fixture or the PayPal balance endpoint. The forecast is a model, not guaranteed income.” Point out that baseline future income is zero and show the uncertainty band.
+Show the balance source and currency. In the included sparse demo, Forecast should report that recent debit history is insufficient and withhold personalized forecast values. Say: “LedgerLens does not fill missing spend history with a made-up average.” If a live account has enough history, show the source window and empirical daily-spend sample count; do not describe simulation coverage as measured forecast accuracy.
 
 ## 0:55–1:25 — Trace the ledger
 
@@ -18,11 +18,11 @@ Open Transactions. Show the source labels and the small fixture ledger. Explain 
 
 ## 1:25–2:00 — Simulate a decision
 
-Open Forecast, enter an explicitly hypothetical receipt if desired, adjust delay or emergency-expense inputs, and run the scenario. Explain that this changes model assumptions only; it does not schedule, send, or move a payment.
+Open Forecast. When the demo history is insufficient, set an explicit daily-spend assumption before running a what-if scenario. An entered receipt or emergency amount is hypothetical only; it does not schedule, send, or move a payment.
 
 ## 2:00–2:25 — Review intelligence
 
-Open Forecast or Insights to explain the seeded Monte Carlo range and assumptions. Open Anomaly Review only if the batch contains enough eligible records; say outliers are signals for human review, never fraud findings. Recurring detection requires repeated observed events.
+Open Engineering Scorecard and distinguish passed automated tests from NOT EVALUABLE model metrics. Calibration data has no positive labels. Open Anomaly Review only if the batch contains enough eligible records; say outliers are review signals, never fraud findings. Recurring detection requires repeated observed events.
 
 ## 2:25–2:45 — Close on trust
 

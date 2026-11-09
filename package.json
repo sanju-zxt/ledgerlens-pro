@@ -14,10 +14,11 @@
     "dev:all": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:ml\"",
     "dev:server": "npm run dev --workspace=server",
     "dev:client": "npm run dev --workspace=client",
-    "build": "npm run build --workspace=client",
-    "test": "npm run test:server && npm run test:ml && npm run test:evidence",
+    "build": "npm run quality:report && npm run build --workspace=client",
+    "test": "node scripts/run-tests-and-report.mjs",
     "validate": "powershell -File validate.ps1",
     "manifest": "node generate-manifest.cjs",
+    "quality:report": "node scripts/generate-quality-scorecard.mjs",
     "test:server": "node --test server/src/services/*.test.js server/src/routes.test.js",
     "test:ml": "npm run test --workspace=ledgerlens-ml",
     "test:evidence": "python -m unittest test_evidence.py"

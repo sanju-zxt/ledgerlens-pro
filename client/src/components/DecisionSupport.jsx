@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 const percent = value => `${(value * 100).toFixed(1)}%`
 
 export function DecisionSupport({ forecast }) {
-  if (!forecast) return null
+  if (!forecast || forecast.forecast_status === "insufficient_history" || forecast.reserve_breach_probability == null) return null
   const simulations = forecast.simulations
   const breachCount = Math.round(forecast.reserve_breach_probability * simulations)
   const threshold = new Intl.NumberFormat(undefined, {

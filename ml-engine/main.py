@@ -2,7 +2,8 @@
 from typing import List
 import hmac
 import os
-from datetime import datetime
+from bisect import bisect_left
+from datetime import datetime, timezone
 import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -37,15 +38,16 @@ class ForecastRequest(BaseModel):
     payment_amount: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     payment_day_start: int = Field(default=7, ge=1, le=90)
     payment_day_end: int = Field(default=13, ge=1, le=90)
-    daily_expense_mean: float = Field(default=78.0, ge=0, allow_inf_nan=False)
-    daily_expense_std: float = Field(default=15.0, ge=0, allow_inf_nan=False)
+    daily_expense_mean: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    daily_expense_std: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    daily_expense_samples: List[float] | None = Field(default=None, max_length=90)
     reserve_threshold: float = Field(default=1000.0, ge=0, allow_inf_nan=False)
     simulations: int = Field(default=10000, ge=100, le=50000)
     horizon_days: int = Field(default=30, ge=1, le=90)
     seed: int = Field(default=42, ge=0, le=4294967295)
-    emergency_probability: float = Field(default=0.05, ge=0, le=1, allow_inf_nan=False)
-    emergency_min: float = Field(default=200, ge=0, allow_inf_nan=False)
-    emergency_max: float = Field(default=500, ge=0, allow_inf_nan=False)
+    emergency_probability: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
+    emergency_min: float = Field(default=0, ge=0, allow_inf_nan=False)
+    emergency_max: float = Field(default=0, ge=0, allow_inf_nan=False)
 
 
 class AnomalyRequest(BaseModel):
@@ -70,6 +72,8 @@ async def forecast(request: ForecastRequest):
         raise HTTPException(400, "emergency_min must not exceed emergency_max")
     if request.payment_day_start > request.payment_day_end:
         raise HTTPException(400, "payment_day_start must not exceed payment_day_end")
+    if request.daily_expense_samples is not None and (not request.daily_expense_samples or not np.isfinite(request.daily_expense_samples).all() or any(value < 0 for value in request.daily_expense_samples)):
+        raise HTTPException(400, "daily_expense_samples must contain non-negative finite values")
     rng = np.random.Generator(np.random.PCG64(request.seed))
     n, horizon = request.simulations, request.horizon_days
     balances = np.full(n, request.current_balance, dtype=np.float64)
@@ -84,7 +88,9 @@ async def forecast(request: ForecastRequest):
     for day in range(1, horizon + 1):
         # Same-day event order: incoming payment, clipped operating expense, then emergency.
         balances += np.where(payment_days == day, request.payment_amount, 0.0)
-        expenses = np.maximum(0, rng.normal(request.daily_expense_mean, request.daily_expense_std, n))
+        expenses = (rng.choice(request.daily_expense_samples, size=n, replace=True)
+                    if request.daily_expense_samples is not None
+                    else np.maximum(0, rng.normal(request.daily_expense_mean, request.daily_expense_std, n)))
         balances -= expenses
         balances -= np.where(has_emergency & (emergency_days == day), emergency_amounts, 0.0)
         newly_breached = (balances < request.reserve_threshold) & (first_breach_day > horizon)
@@ -117,7 +123,7 @@ async def forecast(request: ForecastRequest):
         "ending_below_reserve_probability": ending_breach_count / n,
         "ending_below_reserve_probability_95ci": wilson_interval(ending_breach_count),
         "chart_data": series, "simulations": n, "horizon_days": horizon,
-        "provenance": {"kind": "simulation", "method": "Monte Carlo", "seed": request.seed, "generator": "NumPy PCG64", "assumptions": {"payment_amount": request.payment_amount, "payment_day_range": [request.payment_day_start, request.payment_day_end], "daily_operating_expense": f"Normal({request.daily_expense_mean}, {request.daily_expense_std}), clipped at zero", "emergency_probability_per_path": request.emergency_probability, "emergency_amount_range": [request.emergency_min, request.emergency_max], "same_day_event_order": ["payment", "operating expense", "emergency expense"]}}
+        "provenance": {"kind": "simulation", "method": "Monte Carlo", "seed": request.seed, "generator": "NumPy PCG64", "assumptions": {"payment_amount": request.payment_amount, "payment_day_range": [request.payment_day_start, request.payment_day_end], "daily_operating_expense": {"distribution": "empirical bootstrap" if request.daily_expense_samples is not None else "Normal assumption clipped at zero", "mean": request.daily_expense_mean, "std": request.daily_expense_std, "observed_daily_sample_count": len(request.daily_expense_samples) if request.daily_expense_samples is not None else 0}, "emergency_probability_per_path": request.emergency_probability, "emergency_amount_range": [request.emergency_min, request.emergency_max], "same_day_event_order": ["payment", "operating expense", "emergency expense"]}}
     }
 
 
@@ -134,43 +140,63 @@ async def detect_anomaly(request: AnomalyRequest):
         if len(group) < 3:
             skipped[currency] = len(group)
             continue
-        peer_counts = {}
-        for _, tx in group:
-            peer = (tx.category.strip().casefold(), tx.description.strip().casefold())
-            peer_counts[peer] = peer_counts.get(peer, 0) + 1
-        features = []
-        time_values = []
-        for _, tx in group:
-            peer = (tx.category.strip().casefold(), tx.description.strip().casefold())
-            try:
-                timestamp = datetime.fromisoformat(tx.date.replace("Z", "+00:00"))
-                week_hour = timestamp.weekday() * 24 + timestamp.hour + timestamp.minute / 60
-                angle = 2 * np.pi * week_hour / 168
-                time_features = [np.sin(angle), np.cos(angle), 1.0]
-                time_values.append(week_hour)
-            except ValueError:
-                time_features = [0.0, 0.0, 0.0]
-                time_values.append(None)
-            features.append([np.log1p(abs(tx.amount)), float(np.sign(tx.amount)), np.log1p(peer_counts[peer]), *time_features])
-        model = IsolationForest(contamination=request.sensitivity, random_state=42)
-        predictions = model.fit_predict(np.asarray(features, dtype=float))
-        scores = model.score_samples(np.asarray(features, dtype=float))
         magnitudes = np.array([abs(tx.amount) for _, tx in group], dtype=float)
         median = float(np.median(magnitudes))
         mad = float(np.median(np.abs(magnitudes - median)))
-        scale = 1.4826 * mad
+        q25, q75 = np.percentile(magnitudes, [25, 75])
+        robust_scale = 1.4826 * mad if mad > 0 else float((q75 - q25) / 1.349)
+        timestamps = []
+        for _, tx in group:
+            try:
+                parsed = datetime.fromisoformat(tx.date.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                timestamps.append(parsed.timestamp())
+            except ValueError:
+                timestamps.append(None)
+        valid_times = sorted(value for value in timestamps if value is not None)
+        prior_peer_count = {}
+        features_by_index = {}
+        metadata_by_index = {}
+        chronological = sorted(range(len(group)), key=lambda position: (timestamps[position] is None, timestamps[position] or 0, position))
+        previous = []
+        for position in chronological:
+            index, tx = group[position]
+            peer = (tx.category.strip().casefold(), tx.description.strip().casefold())
+            timestamp = timestamps[position]
+            if timestamp is not None:
+                parsed = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                week_hour = parsed.weekday() * 24 + parsed.hour + parsed.minute / 60
+                angle = 2 * np.pi * week_hour / 168
+                time_features = [np.sin(angle), np.cos(angle)]
+                prior_boundary = bisect_left(valid_times, timestamp)
+                previous_24h = prior_boundary - bisect_left(valid_times, timestamp - 86400, 0, prior_boundary)
+                previous_7d = prior_boundary - bisect_left(valid_times, timestamp - 7 * 86400, 0, prior_boundary)
+            else:
+                week_hour = None
+                time_features = [0.0, 0.0]
+                previous_24h = previous_7d = 0
+            amount_z = (abs(tx.amount) - median) / robust_scale if robust_scale else 0.0
+            peer_prior = prior_peer_count.get(peer, 0)
+            features_by_index[position] = [np.log1p(abs(tx.amount)), float(np.sign(tx.amount)), amount_z, np.log1p(peer_prior), np.log1p(previous_24h), np.log1p(previous_7d), *time_features]
+            metadata_by_index[position] = {"peer_prior": peer_prior, "week_hour": week_hour, "amount_z": amount_z, "previous_24h": previous_24h, "previous_7d": previous_7d}
+            prior_peer_count[peer] = peer_prior + 1
+        features = [features_by_index[position] for position in range(len(group))]
+        model = IsolationForest(contamination=request.sensitivity, random_state=42)
+        predictions = model.fit_predict(np.asarray(features, dtype=float))
+        scores = model.score_samples(np.asarray(features, dtype=float))
         for position, ((index, tx), prediction) in enumerate(zip(group, predictions)):
             if prediction != -1:
                 continue
-            relative_deviation = abs(abs(tx.amount) - median) / scale if scale else None
-            reason = "Transaction amount differs materially from the within-currency batch." if relative_deviation is not None and relative_deviation >= 3 else "Combined amount, transaction-time, and peer-frequency features differ from this within-currency batch."
+            metadata = metadata_by_index[position]
+            reason = "Transaction amount is an extreme robust deviation from this currency batch." if abs(metadata["amount_z"]) >= 3.5 else "Combined amount, prior merchant/category frequency, transaction velocity, and time-of-week features differ from this currency batch."
             anomalies.append({
                 "index": index, "transaction": tx.model_dump(), "score": float(scores[position]),
                 "reason": reason,
-                "features": {"currency_batch_median_abs_amount": median, "description_category_batch_frequency": peer_counts[(tx.category.strip().casefold(), tx.description.strip().casefold())], "time_feature_available": time_values[position] is not None}
+                "features": {"currency_batch_median_abs_amount": median, "robust_amount_z": float(metadata["amount_z"]), "description_category_prior_frequency": metadata["peer_prior"], "previous_24h_transaction_count": metadata["previous_24h"], "previous_7d_transaction_count": metadata["previous_7d"], "time_of_week_hour": metadata["week_hour"]}
             })
     message = "At least 3 completed transactions per currency are required for analysis." if skipped and not anomalies else None
-    return {"anomalies": anomalies, "message": message, "total_checked": len(eligible), "skipped_currency_groups": skipped, "feature_set": ["log absolute amount", "direction", "description/category frequency", "time of week", "currency-isolated model"], "interpretation": "Statistical outliers are review prompts, not confirmed fraud. Batch-relative signals are not merchant history."}
+    return {"anomalies": anomalies, "message": message, "total_checked": len(eligible), "skipped_currency_groups": skipped, "feature_set": ["log absolute amount", "transaction direction", "robust amount deviation", "prior-only merchant/category frequency", "prior 24-hour and 7-day transaction velocity", "time of week", "currency-isolated Isolation Forest"], "interpretation": "Statistical outliers are review prompts, not confirmed fraud. Batch-relative signals are not merchant history. Precision, recall, and F1 are unverified without independent anomaly labels."}
 
 
 @app.post("/calibration", dependencies=[Depends(require_internal_api_key)])

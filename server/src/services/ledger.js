@@ -10,11 +10,23 @@ export function parseCsvRecords(contents) {
   let row = [];
   let field = "";
   let quoted = false;
+  let afterQuote = false;
+  const finishRow = () => {
+    row.push(field); field = "";
+    if (row.some(value => value !== "")) rows.push(row);
+    row = [];
+  };
   for (let index = 0; index < contents.length; index++) {
     const char = contents[index];
-    if (quoted) {
+    if (afterQuote) {
+      if (char === ",") { row.push(field); field = ""; afterQuote = false; }
+      else if (char === "\n" || char === "\r") {
+        if (char === "\r" && contents[index + 1] === "\n") index++;
+        finishRow(); afterQuote = false;
+      } else throw new Error("Invalid CSV: unexpected data after a closing quote");
+    } else if (quoted) {
       if (char === '"' && contents[index + 1] === '"') { field += '"'; index++; }
-      else if (char === '"') quoted = false;
+      else if (char === '"') { quoted = false; afterQuote = true; }
       else field += char;
     } else if (char === '"') {
       if (field.length) throw new Error("Invalid CSV: quote must start a field");
@@ -22,14 +34,11 @@ export function parseCsvRecords(contents) {
     } else if (char === ",") { row.push(field); field = ""; }
     else if (char === "\n" || char === "\r") {
       if (char === "\r" && contents[index + 1] === "\n") index++;
-      row.push(field); field = "";
-      if (row.some(value => value !== "")) rows.push(row);
-      row = [];
+      finishRow();
     } else field += char;
   }
   if (quoted) throw new Error("Invalid CSV: unterminated quoted field");
-  row.push(field);
-  if (row.some(value => value !== "")) rows.push(row);
+  if (field.length || row.length || !afterQuote) finishRow();
   return rows;
 }
 

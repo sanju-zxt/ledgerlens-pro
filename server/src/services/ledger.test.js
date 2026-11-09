@@ -12,6 +12,14 @@ test("CSV reader rejects an unterminated quoted field", () => {
   assert.throws(() => parseCsvRecords('name,note\nitem,"unfinished'), /unterminated quoted field/);
 });
 
+test("CSV reader rejects characters after a closing quoted field", () => {
+  assert.throws(() => parseCsvRecords('name,note\nitem,"quoted"tail\n'), /unexpected data after a closing quote/);
+});
+
+test("CSV reader rejects a quote inside an unquoted field", () => {
+  assert.throws(() => parseCsvRecords('name,note\nitem,bad"quote\n'), /quote must start a field/);
+});
+
 test("checked-in evidence ledger parses and reconciles", () => {
   const ledger = readLedgerEvidence();
   assert.equal(ledger.transactions.length, 2);

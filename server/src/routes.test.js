@@ -33,6 +33,18 @@ test("configured login provides access to the evidence ledger", async () => {
     assert.equal(ledger.body.total, 2);
     assert.equal(ledger.body.data.length, 1);
     assert.equal(ledger.body.source, "SANDBOX_EVIDENCE");
+    const forecast = await agent.get("/api/forecast");
+    assert.equal(forecast.status, 200);
+    assert.equal(forecast.body.forecast_status, "insufficient_history");
+    assert.equal(forecast.body.ending_balance, undefined);
+    assert.match(forecast.body.history_profile.reason, /Need at least 10 completed debit transactions/);
+    const scenario = await agent.post("/api/forecast/simulate").send({});
+    assert.equal(scenario.status, 400);
+    assert.match(scenario.body.message, /enter an explicit daily operating-expense assumption/i);
+    const hypothetical = await agent.post("/api/forecast/simulate").send({ daily_expense_mean: 50, daily_expense_std: 0 });
+    assert.equal(hypothetical.status, 200);
+    assert.equal(hypothetical.body.forecast_status, "scenario");
+    assert.equal(hypothetical.body.scenario_applied.expense_assumption_source, "USER_ENTERED_HYPOTHETICAL");
     const reconciliation = await agent.get("/api/transactions/reconciliation");
     assert.equal(reconciliation.body.calculated_closing_balance, "6982.56");
     assert.equal(reconciliation.body.reconciled, true);

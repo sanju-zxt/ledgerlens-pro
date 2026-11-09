@@ -23,11 +23,22 @@ class ServiceAuthTests(unittest.TestCase):
 
 class ForecastTests(unittest.TestCase):
     def test_forecast_does_not_assume_unverified_future_income(self):
-        self.assertEqual(ForecastRequest(current_balance=1000).payment_amount, 0.0)
+        request = ForecastRequest(current_balance=1000)
+        self.assertEqual(request.payment_amount, 0.0)
+        self.assertEqual(request.daily_expense_mean, 0.0)
+        self.assertEqual(request.daily_expense_std, 0.0)
+        self.assertEqual(request.emergency_probability, 0.0)
 
     def test_reproducible_seeded_forecast(self):
         request = ForecastRequest(current_balance=3500, payment_amount=1000, daily_expense_mean=80, daily_expense_std=15, simulations=1000, seed=42)
         self.assertEqual(asyncio.run(forecast(request)), asyncio.run(forecast(request)))
+
+    def test_empirical_daily_spend_samples_are_used_and_provenanced(self):
+        request = ForecastRequest(current_balance=1000, daily_expense_samples=[0, 0, 20], simulations=1000, seed=17)
+        result = asyncio.run(forecast(request))
+        self.assertEqual(result["provenance"]["assumptions"]["daily_operating_expense"]["distribution"], "empirical bootstrap")
+        self.assertEqual(result["provenance"]["assumptions"]["daily_operating_expense"]["observed_daily_sample_count"], 3)
+        self.assertLessEqual(result["ending_balance"]["median"], 1000)
 
     def test_separate_breach_metrics_and_interval(self):
         result = asyncio.run(forecast(ForecastRequest(current_balance=1100, payment_amount=0, daily_expense_mean=0, daily_expense_std=0, simulations=100, emergency_probability=0)))
@@ -83,6 +94,9 @@ class AnomalyTests(unittest.TestCase):
         self.assertEqual(result["total_checked"], 5)
         self.assertTrue(result["anomalies"])
         self.assertIn("not confirmed fraud", result["interpretation"])
+        self.assertIn("robust amount deviation", result["feature_set"])
+        extreme = next(item for item in result["anomalies"] if item["transaction"]["amount"] == 5000.0)
+        self.assertGreaterEqual(extreme["features"]["robust_amount_z"], 3.5)
 
     def test_completed_activity_is_analyzed_per_currency_and_refunds_are_excluded(self):
         transactions = [

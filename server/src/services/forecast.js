@@ -1,4 +1,4 @@
-const DEFAULTS = Object.freeze({ simulations: 10000, horizon: 30, seed: 42, paymentAmount: 0, paymentDays: [7, 13], dailyExpenseMean: 78, dailyExpenseStd: 15, emergencyProbability: 0.05, emergencyAmount: [200, 500], reserveThreshold: 1000 });
+const DEFAULTS = Object.freeze({ simulations: 10000, horizon: 30, seed: 42, paymentAmount: 0, paymentDays: [7, 13], dailyExpenseMean: 0, dailyExpenseStd: 0, dailyExpenseSamples: null, emergencyProbability: 0, emergencyAmount: [0, 0], reserveThreshold: 1000 });
 const WILSON_Z = 1.959963984540054;
 
 function random(seed) {
@@ -36,7 +36,7 @@ function wilsonInterval(successes, trials) {
 
 function validateAssumptions(input, assumptions) {
   if (!input || typeof input !== "object") throw new Error("forecast input must be an object");
-  const { simulations, horizon, seed, paymentAmount, paymentDays, dailyExpenseMean, dailyExpenseStd, emergencyProbability, emergencyAmount, reserveThreshold } = assumptions;
+  const { simulations, horizon, seed, paymentAmount, paymentDays, dailyExpenseMean, dailyExpenseStd, dailyExpenseSamples, emergencyProbability, emergencyAmount, reserveThreshold } = assumptions;
   if (!Number.isFinite(input.currentBalance)) throw new Error("currentBalance must be a finite number");
   if (!Number.isInteger(simulations) || simulations < 100 || simulations > 50000) throw new Error("simulations must be between 100 and 50000");
   if (!Number.isInteger(horizon) || horizon < 1 || horizon > 90) throw new Error("horizon must be between 1 and 90 days");
@@ -44,13 +44,14 @@ function validateAssumptions(input, assumptions) {
   if (!Number.isFinite(paymentAmount) || paymentAmount < 0) throw new Error("paymentAmount must be a non-negative finite number");
   if (!Array.isArray(paymentDays) || paymentDays.length !== 2 || !paymentDays.every(Number.isSafeInteger) || paymentDays[0] < 1 || paymentDays[1] > 90 || paymentDays[0] > paymentDays[1]) throw new Error("paymentDays must be an ordered pair of integer days from 1 to 90");
   if (![dailyExpenseMean, dailyExpenseStd, reserveThreshold].every(Number.isFinite) || dailyExpenseMean < 0 || dailyExpenseStd < 0 || reserveThreshold < 0) throw new Error("expense parameters and reserveThreshold must be non-negative finite numbers");
+  if (dailyExpenseSamples !== null && (!Array.isArray(dailyExpenseSamples) || dailyExpenseSamples.length === 0 || dailyExpenseSamples.some(value => !Number.isFinite(value) || value < 0))) throw new Error("dailyExpenseSamples must be a non-empty array of non-negative finite amounts");
   if (!Number.isFinite(emergencyProbability) || emergencyProbability < 0 || emergencyProbability > 1) throw new Error("emergencyProbability must be between 0 and 1");
   if (!Array.isArray(emergencyAmount) || emergencyAmount.length !== 2 || !emergencyAmount.every(Number.isFinite) || emergencyAmount[0] < 0 || emergencyAmount[0] > emergencyAmount[1]) throw new Error("emergencyAmount must be an ordered pair of non-negative finite amounts");
 }
 
 export function forecastCashflow(input) {
   const assumptions = { ...DEFAULTS, ...input };
-  const { simulations, horizon, seed, reserveThreshold } = assumptions;
+  const { simulations, horizon, seed, reserveThreshold, dailyExpenseSamples } = assumptions;
   validateAssumptions(input, assumptions);
   const rand = random(seed);
   const paths = Array.from({ length: horizon + 1 }, () => []);
@@ -68,10 +69,15 @@ export function forecastCashflow(input) {
     for (let day = 1; day <= horizon; day++) {
       // Same-day order: incoming payment, operating expense, then emergency expense.
       if (day === paymentDay) balance += assumptions.paymentAmount;
-      let u1 = Math.max(rand(), Number.EPSILON);
-      const u2 = rand();
-      const normal = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      balance -= Math.max(0, assumptions.dailyExpenseMean + assumptions.dailyExpenseStd * normal);
+      let dailyExpense;
+      if (dailyExpenseSamples) dailyExpense = dailyExpenseSamples[Math.floor(rand() * dailyExpenseSamples.length)];
+      else {
+        const u1 = Math.max(rand(), Number.EPSILON);
+        const u2 = rand();
+        const normal = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        dailyExpense = Math.max(0, assumptions.dailyExpenseMean + assumptions.dailyExpenseStd * normal);
+      }
+      balance -= dailyExpense;
       if (day === emergencyDay) balance -= emergencyAmount;
       if (balance < reserveThreshold) {
         breached = true;
@@ -101,6 +107,6 @@ export function forecastCashflow(input) {
     ending_below_reserve_probability: endingBreachCount / simulations,
     ending_below_reserve_probability_95ci: wilsonInterval(endingBreachCount, simulations),
     chart_data: series,
-    provenance: { kind: "simulation", method: "Monte Carlo", seed, assumptions: { ...assumptions, dailyExpenseDistribution: "Normal clipped at zero", event_order: ["payment", "operating expense", "emergency expense"] } }
+    provenance: { kind: "simulation", method: "Monte Carlo", seed, assumptions: { ...assumptions, dailyExpenseSamples: dailyExpenseSamples ? `${dailyExpenseSamples.length} observed daily samples` : null, dailyExpenseDistribution: dailyExpenseSamples ? "Empirical bootstrap with replacement" : "Normal assumption clipped at zero", event_order: ["payment", "operating expense", "emergency expense"] } }
   };
 }

@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 .env
 *.log
 dist/
@@ -21,3 +21,4 @@ __pycache__/
 .p7c
 .pfx
 .p12
+.venv-audit/

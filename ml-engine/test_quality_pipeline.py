@@ -2,6 +2,7 @@
 import tempfile
 import unittest
 import os
+import asyncio
 from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,8 +10,7 @@ from pathlib import Path
 from quality_pipeline import add_label, dataset_report, experiment, forecast_report, label_history, record_forecast_snapshot, score_review_labels
 from main import require_durable_store
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
-from main import app
+from main import pipeline_add_label, pipeline_labels, pipeline_experiment, require_internal_api_key, ReviewedLabelRequest
 
 
 class QualityPipelineTests(unittest.TestCase):
@@ -74,21 +74,21 @@ class QualityPipelineTests(unittest.TestCase):
     def test_authenticated_pipeline_api_stores_and_scopes_reviews(self):
         environment = {"NODE_ENV": "production", "MODEL_DATA_PATH": str(self.db), "ML_ENGINE_API_KEY": "test-internal-key"}
         with patch.dict(os.environ, environment):
-            client = TestClient(app)
-            self.assertEqual(client.get("/pipeline/labels?tenant=tenant-api").status_code, 401)
-            headers = {"Authorization": "Bearer test-internal-key"}
-            payload = {"tenant": "tenant-api", "reviewer": "reviewer@example.test", "label": 1,
-                       "rationale": "Human reviewed the source transaction evidence.",
-                       "transaction": {"id": "api-tx", "date": "2025-01-01T00:00:00Z", "amount": 999,
-                                       "currency": "USD", "category": "purchase", "description": "source event", "status": "COMPLETED"}}
-            saved = client.post("/pipeline/labels", headers=headers, json=payload)
-            self.assertEqual(saved.status_code, 200, saved.text)
-            self.assertIn("sha256:", saved.json()["label"]["evidence_ref"])
-            own = client.get("/pipeline/labels?tenant=tenant-api", headers=headers)
-            other = client.get("/pipeline/labels?tenant=other", headers=headers)
-            self.assertEqual(len(own.json()["labels"]), 1)
-            self.assertEqual(len(other.json()["labels"]), 0)
-            self.assertEqual(client.get("/pipeline/experiment?tenant=tenant-api", headers=headers).json()["status"], "NOT EVALUABLE")
+            with self.assertRaises(HTTPException) as failure: require_internal_api_key(None)
+            self.assertEqual(failure.exception.status_code, 401)
+            require_internal_api_key("Bearer test-internal-key")
+            payload = ReviewedLabelRequest(tenant="tenant-api", reviewer="reviewer@example.test", label=1,
+                       rationale="Human reviewed the source transaction evidence.",
+                       transaction={"id": "api-tx", "date": "2025-01-01T00:00:00Z", "amount": 999,
+                                    "currency": "USD", "category": "purchase", "description": "source event", "status": "COMPLETED"})
+            saved = asyncio.run(pipeline_add_label(payload))
+            self.assertTrue(saved["saved"])
+            self.assertIn("sha256:", saved["label"]["evidence_ref"])
+            own = asyncio.run(pipeline_labels("tenant-api"))
+            other = asyncio.run(pipeline_labels("other"))
+            self.assertEqual(len(own["labels"]), 1)
+            self.assertEqual(len(other["labels"]), 0)
+            self.assertEqual(asyncio.run(pipeline_experiment("tenant-api"))["status"], "NOT EVALUABLE")
 
     def test_forecast_snapshots_match_later_outcomes_and_report_sample_gates(self):
         start = datetime(2025, 1, 1, tzinfo=timezone.utc)

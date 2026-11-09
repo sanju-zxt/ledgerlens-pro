@@ -2,6 +2,8 @@
 
 **Navigate your future with transparent financial intelligence.** LedgerLens is a merchant cash-flow planning prototype built around PayPal reporting data, reproducible forecasts, and auditable evidence.
 
+**Open-source license:** MIT. The root [LICENSE](LICENSE) file contains the full text. MIT is an OSI-approved open-source license.
+
 ## Current scope and data labels
 
 - The included balance ledger is a small **sandbox evidence fixture**, dated October 15, 2026. It is not a connected merchant account.
@@ -14,7 +16,7 @@
 - The workspace includes a collapsible navigation menu, model-quality and engineering-scorecard pages, and a build-update page. The scorecard records targets, measured values, evidence sources, sample sizes, evaluation times, and status; unavailable metrics stay NOT EVALUABLE.
 - The local PayPal Sandbox Reporting connection was verified on 2026-11-09: the balance and Transaction Search endpoints succeeded for the account associated with the configured app credentials. A sanitized report is stored in `evidence/paypal_sandbox_verification.json`; it contains no transaction IDs, descriptions, or amounts. This does not verify the deployed Render secrets or third-party merchant OAuth.
 
-## Architecture
+## Technologies and implementation
 
 | Component | Stack | Local port |
 | --- | --- | ---: |
@@ -23,9 +25,22 @@
 | ML service | FastAPI, NumPy PCG64, scikit-learn Isolation Forest | 8001 |
 | Evidence | Read-only CSV/JSON fixtures and SHA-256 manifest | — |
 
-The Express API's seeded JavaScript Monte Carlo engine is the authoritative forecast used by the dashboard and scenario simulator. The baseline resamples observed UTC daily debit totals and excludes refunds, reversals, pending activity, and other currencies. The FastAPI forecast endpoint remains an independent reference implementation and is not consumed by the web application; cross-engine bit-for-bit parity is not claimed. The ML service provides batch Isolation Forest review using robust amount deviation, prior-only peer frequency, transaction velocity and time features. Precision, recall, F1, ECE targets, and forecast accuracy remain unverified without independent representative labels and paired forecast outcomes. Configured PayPal credentials can load Reporting balances and Transaction Search for the account associated with that app. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented; this is not yet a multi-merchant SaaS product.
+### PayPal integration
 
-## Setup
+The Express API uses PayPal OAuth 2.0 client-credentials authentication on the server to call the PayPal Reporting API. It can request balance snapshots and Transaction Search results for the PayPal account associated with the configured app credentials. The browser calls LedgerLens endpoints; PayPal secrets and access tokens stay on the server. Reporting credentials are read-only and do not initiate payments.
+
+The transaction view and anomaly review can use either clearly identified checked-in Sandbox evidence or PayPal Transaction Search results. Sandbox API access was verified locally on 2026-11-09; this does not verify the hosted Render credentials. App credentials do not let another merchant connect their PayPal account. Merchant OAuth consent, webhooks, and multi-merchant account isolation are not implemented.
+
+### AI and financial calculations
+
+- **Unusual-activity review:** the Python ML service applies scikit-learn Isolation Forest to transaction features such as robust amount deviation, prior-only description/category frequency, transaction velocity, time, and currency-specific peer groups. It returns statistical review prompts, not fraud determinations. Requests with fewer than three completed transactions in a currency group are skipped.
+- **Supervised review model:** reviewed labels can be collected with provenance and evaluated chronologically. It is activated only when the tenant-scoped model passes the configured validation gate; current evidence is insufficient to establish real-world precision, recall, F1, or calibration quality.
+- **Cash-flow forecast:** the dashboard uses an explicitly seeded JavaScript Monte Carlo simulation that resamples eligible historical daily debits. It is a statistical simulation, not a trained AI forecast model. Future receipts and scenario costs are assumptions, and forecast accuracy has not been validated against matched real outcomes.
+- **Evidence and arithmetic:** the API uses Decimal.js for ledger reconciliation. The read-only evidence manifest uses SHA-256 hashes to make fixture integrity checks reproducible.
+
+The FastAPI forecast endpoint is an independent reference implementation and is not consumed by the dashboard; cross-engine bit-for-bit parity is not claimed. PostgreSQL persistence, merchant OAuth consent, verified webhooks, and persistent idempotency storage are not implemented, so this is not yet a multi-merchant SaaS product.
+
+## Setup and run locally
 
 Requirements: Node.js 20.19+ (or 22.12+), Python 3.10+, and npm. PowerShell is needed only for the optional manifest validator on Windows.
 

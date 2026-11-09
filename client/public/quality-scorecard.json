@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-09T05:18:30.366Z",
+  "generatedAt": "2026-11-09T05:26:28.493Z",
   "generator": "scripts/generate-quality-scorecard.mjs",
   "policy": "No aggregate score is calculated. Metrics without sufficient, relevant evidence are NOT EVALUABLE.",
   "integrity": {
@@ -24,7 +24,7 @@
       "title": "Controlled synthetic anomaly benchmark",
       "status": "SYNTHETIC BENCHMARK ONLY",
       "not_customer_evidence": true,
-      "generated_at": "2026-11-09T05:18:30.135716+00:00",
+      "generated_at": "2026-11-09T05:26:27.715266+00:00",
       "dataset": {
         "version": "controlled-patterns-v1-seed-20261109",
         "generator": "ml-engine/synthetic_benchmark.py",
@@ -107,7 +107,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -141,7 +141,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -175,7 +175,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -209,7 +209,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -243,7 +243,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -277,7 +277,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -311,7 +311,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -345,7 +345,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Measured on the supplied sample only; all labels are negative, so this descriptive value is not evidence of representative model performance.",
         "tiers": [
@@ -381,7 +381,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
         "tiers": [
@@ -415,7 +415,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
         "tiers": [
@@ -449,7 +449,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
         "tiers": [
@@ -483,7 +483,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
         "tiers": [
@@ -517,7 +517,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
         "tiers": [
@@ -551,7 +551,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "No paired historical forecast and actual-outcome rows are present in checked-in evidence.",
         "tiers": [
@@ -586,7 +586,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "tiers": [
           {
             "tier": "Next target",
@@ -613,7 +613,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "tiers": [
           {
             "tier": "Next target",
@@ -640,7 +640,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "tiers": [
           {
             "tier": "Next target",
@@ -667,7 +667,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "tiers": [
           {
             "tier": "Next target",
@@ -697,7 +697,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
       },
       {
@@ -713,7 +713,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
       },
       {
@@ -729,7 +729,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
       },
       {
@@ -745,7 +745,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
       },
       {
@@ -761,7 +761,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "reason": "Planning gates only; sample count alone does not establish representative labels, independence, or sufficient power."
       }
     ],
@@ -779,7 +779,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -796,7 +796,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -813,7 +813,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -830,7 +830,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -847,7 +847,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -864,7 +864,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -881,7 +881,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Evidence source does not currently provide this measurement."
       },
@@ -898,7 +898,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "MEASURED",
         "reason": "Suite pass rate only; not a model or financial accuracy score."
       }
@@ -916,7 +916,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "PASS",
         "reason": "One checked-in sandbox ledger fixture only; not production or multicurrency certification.",
         "tiers": [
@@ -949,7 +949,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "PASS",
         "reason": "Verifies file integrity against the repository manifest, not independent source authenticity.",
         "tiers": [
@@ -982,7 +982,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "PASS",
         "reason": "PayPal account associated with these Sandbox app credentials; not arbitrary merchants",
         "tiers": [
@@ -1015,7 +1015,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "PASS",
         "reason": "Test pass rate is distinct from coverage and model accuracy.",
         "tiers": [
@@ -1048,7 +1048,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "PASS",
         "reason": "Pass means both CI audit commands completed successfully; it does not replace an independent application security audit.",
         "tiers": [
@@ -1081,7 +1081,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "A passing code test is not complete multi-tenant security verification.",
         "tiers": [
@@ -1114,7 +1114,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Pass rate is not code coverage.",
         "tiers": [
@@ -1147,7 +1147,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "The source rows cannot independently establish provenance.",
         "tiers": [
@@ -1180,7 +1180,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Awaiting source-verified human-review records.",
         "tiers": [
@@ -1213,7 +1213,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Duplicate checks require source-verified records.",
         "tiers": [
@@ -1246,7 +1246,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "A repeat evaluation against a versioned representative dataset has not been recorded.",
         "tiers": [
@@ -1279,7 +1279,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Requires a trained artifact tied to dataset and model versions.",
         "tiers": [
@@ -1312,7 +1312,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "The supplied backtest CSV has no paired numeric actual/predicted outcomes.",
         "tiers": [
@@ -1345,7 +1345,7 @@
           "start": null,
           "end": null
         },
-        "last_evaluated_at": "2026-11-09T05:18:30.366Z",
+        "last_evaluated_at": "2026-11-09T05:26:28.493Z",
         "status": "NOT EVALUABLE",
         "reason": "Requires production telemetry.",
         "tiers": [
@@ -1376,7 +1376,7 @@
       "target": "98–100%",
       "measurementSource": "npm test:server, npm test:ml, npm test:evidence",
       "sampleSize": "57 executed cases across 3 test commands",
-      "lastEvaluatedAt": "2026-11-09T05:17:35.531Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:08.863Z",
       "status": "PASS",
       "note": "Counts are from the automated Node and Python test runners; they measure this test suite, not financial/model accuracy.",
       "originalValue": "41/41 tests (measured before this mission)",
@@ -1389,7 +1389,7 @@
       "target": "≥90%",
       "measurementSource": "Coverage instrumentation is not configured",
       "sampleSize": "Not measured",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not measured",
@@ -1415,7 +1415,7 @@
       "target": "100%",
       "measurementSource": "No multi-tenant identity/data boundary exists to validate",
       "sampleSize": "No tenant isolation suite",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not available",
@@ -1428,7 +1428,7 @@
       "target": "100% of validated cases",
       "measurementSource": "Decimal ledger reconciliation: opening + credits − debits; sequence and transaction-ID checks",
       "sampleSize": "1 checked-in ledger fixture; 2 movements",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "PASS",
       "note": "This verifies one checked-in sandbox ledger only. It is not multicurrency or production financial correctness certification.",
       "originalValue": "Not measured",
@@ -1441,7 +1441,7 @@
       "target": "100%",
       "measurementSource": "SHA-256 and byte-size checks against manifest.json",
       "sampleSize": "5 manifest files",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "PASS",
       "note": "Integrity checks only; this does not establish that source data is representative or externally authentic",
       "originalValue": "Not recorded",
@@ -1467,7 +1467,7 @@
       "target": "<15%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable; generic Normal(78, 15) spend and 5% emergency assumptions",
@@ -1480,7 +1480,7 @@
       "target": "within ±5%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable",
@@ -1493,7 +1493,7 @@
       "target": "65–75%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable",
@@ -1506,7 +1506,7 @@
       "target": "85–95%",
       "measurementSource": "Independent chronological forecast backtest required",
       "sampleSize": "No paired forecast/outcome rows",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluable",
@@ -1519,7 +1519,7 @@
       "target": "<0.05 on representative independent data",
       "measurementSource": "evidence/calibration_data.csv",
       "sampleSize": "646 labels; 0 positive",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "The supplied labels are not an independent representative calibration set; descriptive ECE is not target evidence",
       "originalValue": "0.200869 descriptive; 646 labels, 0 positive",
@@ -1532,7 +1532,7 @@
       "target": ">0",
       "measurementSource": "evidence/calibration_data.csv; observed-prevalence baseline",
       "sampleSize": "646 labels; 0 positive",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "No positive labels are present, so the baseline is not meaningful for event prediction and skill is undefined",
       "originalValue": "Undefined; all-negative labels",
@@ -1545,7 +1545,7 @@
       "target": "≥0.85",
       "measurementSource": "Independent labeled anomaly evaluation required",
       "sampleSize": "No independently labeled representative anomaly set",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not evaluated",
@@ -1558,7 +1558,7 @@
       "target": "<500 ms",
       "measurementSource": "Representative external load test required",
       "sampleSize": "No load-test sample",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not measured",
@@ -1571,7 +1571,7 @@
       "target": "≥99.5%",
       "measurementSource": "Continuous uptime monitoring required",
       "sampleSize": "No monitoring window",
-      "lastEvaluatedAt": "2026-11-09T05:18:30.366Z",
+      "lastEvaluatedAt": "2026-11-09T05:26:28.493Z",
       "status": "NOT EVALUABLE",
       "note": "",
       "originalValue": "Not measured",

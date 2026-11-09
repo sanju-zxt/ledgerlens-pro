@@ -2,7 +2,7 @@
   "title": "Controlled synthetic anomaly benchmark",
   "status": "SYNTHETIC BENCHMARK ONLY",
   "not_customer_evidence": true,
-  "generated_at": "2026-11-09T05:18:30.135716+00:00",
+  "generated_at": "2026-11-09T05:26:27.715266+00:00",
   "dataset": {
     "version": "controlled-patterns-v1-seed-20261109",
     "generator": "ml-engine/synthetic_benchmark.py",

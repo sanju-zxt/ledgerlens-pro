@@ -4,6 +4,6 @@
   "scripts": {
     "start": "python main.py",
     "dev": "uvicorn main:app --reload --port 8001",
-    "test": "python -m unittest discover -p test_*.py -v"
+    "test": "python -c \"import unittest; suite=unittest.defaultTestLoader.discover('.', pattern='test_*.py'); result=unittest.TextTestRunner(verbosity=2).run(suite); raise SystemExit(not result.wasSuccessful())\""
   }
 }
